@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+# make sure we are in the right directory
+cd "$(dirname "$0")"/..
+
+# remove old docker image if it exists
+docker stop lnd && docker rm lnd || true
+
+# call create
+./bin/create
