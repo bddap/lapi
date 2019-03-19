@@ -14,7 +14,7 @@ impl<D: Db, L: LightningNode> Api<D, L> {
         satoshis: Satoshis,
     ) -> impl Future<Item = Invoice, Error = GenerateInvoiceError> + 'a {
         self.lighting_node
-            .create_invoice(lesser, satoshis)
+            .create_invoice(satoshis)
             .map_err(GenerateInvoiceError::Create)
             .and_then(move |untracked_invoice| {
                 self.database
@@ -30,8 +30,8 @@ impl<D: Db, L: LightningNode> Api<D, L> {
     ) -> impl Future<Item = (), Error = PayInvoiceError> + 'a {
         let amount = invoice
             .amount_pico_btc()
-            .map(Satoshis::from_pico_btc)
-            .ok_or(PayInvoiceError::NoAmount);
+            .ok_or(PayInvoiceError::Pay(PayError::NoAmount))
+            .and_then(|pico| Satoshis::from_pico_btc(pico).map_err(PayInvoiceError::Convert));
         FutureResult::from(amount)
             .and_then(move |amount| {
                 self.database
@@ -72,7 +72,7 @@ pub enum GenerateInvoiceError {
 }
 
 pub enum PayInvoiceError {
-    NoAmount,
+    Convert(NotDivisible),
     Begin(BeginWithdrawalError),
     Pay(PayError),
     Finish(FinishWithdrawalError),

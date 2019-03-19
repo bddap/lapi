@@ -4,7 +4,7 @@
 
 - [x] Create lighting node trait
 - [x] Define or import lightning invoice type
-- [ ] Mock lighning node impl
+- [x] Mock lighning node impl
 - [ ] Test write tests gereric over LightningNode and Db traits.
 - [ ] Impl LightningNode with lnd as backend
 - [ ] Impl Db with some sort of persistent storage backend
