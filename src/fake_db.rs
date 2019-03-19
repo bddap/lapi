@@ -41,8 +41,8 @@ impl Db for FakeDb {
 
 struct FakeDbInner {
     balances: BTreeMap<Lesser, Satoshis>,
-    history: BTreeMap<Invoice, (Lesser, InvoiceStatus)>,
-    withdrawals_in_progress: BTreeMap<Invoice, Lesser>,
+    history: BTreeMap<PaymentHash, (Lesser, Invoice, InvoiceStatus)>,
+    withdrawals_in_progress: BTreeMap<PaymentHash, (Invoice, Lesser)>,
 }
 
 impl FakeDbInner {
@@ -51,16 +51,17 @@ impl FakeDbInner {
         lesser: Lesser,
         invoice: Invoice,
     ) -> FutureResult<Invoice, StoreInvoiceError> {
-        match self
-            .history
-            .insert(invoice.clone(), (lesser, InvoiceStatus::Unpaid))
-        {
+        let invoice_uuid = invoice_uuid(&invoice);
+        match self.history.insert(
+            invoice_uuid.clone(),
+            (lesser, invoice.clone(), InvoiceStatus::Unpaid),
+        ) {
             None => {} // Good, there was no entry in the map for this invoice.
             Some(old_value) => {
                 // Bad news, we are re-inserting an invoice that was already logged.
                 // It should not be possible for this to happen. We have a bug.
                 // replace the old value and return an error
-                self.history.insert(invoice.clone(), old_value);
+                self.history.insert(invoice_uuid, old_value);
                 return Err(StoreInvoiceError::EntryAlreadyExists).into();
             }
         }
@@ -87,12 +88,13 @@ impl FakeDbInner {
             .into()
     }
 
+    /// Withdawal is confirmed complete.
     pub fn finish_withdrawal(
         &mut self,
         invoice: PaidInvoice,
     ) -> FutureResult<(), FinishWithdrawalError> {
         self.withdrawals_in_progress
-            .remove(&invoice.0)
+            .remove(&invoice_uuid(&invoice.0))
             .ok_or(FinishWithdrawalError::WithdrawalNotInProgress)
             .map(|_| ())
             .into()
@@ -113,8 +115,8 @@ impl FakeDbInner {
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
         let lesser: Lesser = middle.into();
         self.history
-            .get(&invoice)
-            .and_then(|(entry_lesser, status)| {
+            .get(&invoice_uuid(&invoice))
+            .and_then(|(entry_lesser, _invoice, status)| {
                 if lesser == *entry_lesser {
                     Some(status)
                 } else {

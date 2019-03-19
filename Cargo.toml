@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 u256 = "0.1.0"
 futures = "0.1.25"
+lightning-invoice = "0.2.0"

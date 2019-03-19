@@ -1,16 +1,15 @@
 use crate::common::*;
 use futures::future::FutureResult;
 
-pub struct LightningNode {}
+pub trait LightningNode {
+    /// Generate a unique invoice for n satoshis.
+    fn create_invoice(
+        &self,
+        lesser: Lesser,
+        satoshis: Satoshis,
+    ) -> FutureResult<Invoice, CreateInvoiceError>;
 
-impl LightningNode {
-    pub fn create_invoice(&self, satoshis: Satoshis) -> FutureResult<Invoice, CreateInvoiceError> {
-        unimplemented!()
-    }
-
-    pub fn pay_invoice(&self, invoice: Invoice) -> FutureResult<PaidInvoice, PayError> {
-        unimplemented!()
-    }
+    fn pay_invoice(&self, invoice: Invoice) -> FutureResult<PaidInvoice, PayError>;
 }
 
 pub enum CreateInvoiceError {}

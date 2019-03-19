@@ -1,19 +1,20 @@
 use crate::common::*;
+use futures::future::FutureResult;
 use futures::Future;
 
-struct Api<D: Db> {
+struct Api<D: Db, L: LightningNode> {
     database: D,
-    lighting_node: LightningNode,
+    lighting_node: L,
 }
 
-impl<D: Db> Api<D> {
+impl<D: Db, L: LightningNode> Api<D, L> {
     pub fn generate_invoice<'a>(
         &'a self,
         lesser: Lesser,
         satoshis: Satoshis,
     ) -> impl Future<Item = Invoice, Error = GenerateInvoiceError> + 'a {
         self.lighting_node
-            .create_invoice(satoshis)
+            .create_invoice(lesser, satoshis)
             .map_err(GenerateInvoiceError::Create)
             .and_then(move |untracked_invoice| {
                 self.database
@@ -27,9 +28,16 @@ impl<D: Db> Api<D> {
         master: Master,
         invoice: Invoice,
     ) -> impl Future<Item = (), Error = PayInvoiceError> + 'a {
-        self.database
-            .begin_withdrawal(master, invoice.amount())
-            .map_err(PayInvoiceError::Begin)
+        let amount = invoice
+            .amount_pico_btc()
+            .map(Satoshis::from_pico_btc)
+            .ok_or(PayInvoiceError::NoAmount);
+        FutureResult::from(amount)
+            .and_then(move |amount| {
+                self.database
+                    .begin_withdrawal(master, amount)
+                    .map_err(PayInvoiceError::Begin)
+            })
             .and_then(move |()| {
                 self.lighting_node
                     .pay_invoice(invoice)
@@ -64,6 +72,7 @@ pub enum GenerateInvoiceError {
 }
 
 pub enum PayInvoiceError {
+    NoAmount,
     Begin(BeginWithdrawalError),
     Pay(PayError),
     Finish(FinishWithdrawalError),
