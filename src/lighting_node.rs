@@ -9,11 +9,13 @@ pub trait LightningNode {
     fn pay_invoice(&self, invoice: Invoice) -> FutureResult<PaidInvoice, PayError>;
 }
 
+#[derive(Debug, Clone)]
 pub enum CreateInvoiceError {
     /// Payment amount exeeded 2^64-1 pico-btc.
     TooLarge,
 }
 
+#[derive(Debug, Clone)]
 pub enum PayError {
     NoAmount,
 }

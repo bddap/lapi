@@ -26,11 +26,13 @@ pub trait Db {
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError>;
 }
 
+#[derive(Debug, Clone)]
 pub enum StoreInvoiceError {
     /// Invoice has already been stored.
     EntryAlreadyExists,
 }
 
+#[derive(Debug, Clone)]
 pub enum BeginWithdrawalError {
     /// Not enough funds for withdrawl.
     InsufficeintBalance,
@@ -38,15 +40,18 @@ pub enum BeginWithdrawalError {
     NoBalance,
 }
 
+#[derive(Debug, Clone)]
 pub enum FinishWithdrawalError {
     WithdrawalNotInProgress,
 }
 
+#[derive(Debug, Clone)]
 pub enum CheckBalanceError {
     /// The account in question does not exist.
     NoBalance,
 }
 
+#[derive(Debug, Clone)]
 pub enum CheckInvoiceStatusError {
     /// This invoice was never generated for the user in question.
     InvoiceDoesNotExist,

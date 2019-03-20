@@ -1,5 +1,5 @@
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Satoshis(u64);
+pub struct Satoshis(pub u64);
 
 impl Satoshis {
     pub fn checked_sub(&self, other: &Self) -> Option<Self> {
@@ -22,6 +22,7 @@ impl Satoshis {
 pub struct Withdrawal(pub Satoshis);
 
 /// Returned when converting from pico-btc to satoshi when pico-btc is not a multiple of 10000.
+#[derive(Debug, Clone)]
 pub struct NotDivisible;
 
 // TODO review for overflow errs
