@@ -44,6 +44,7 @@ RPCPASS=$(set_default "$RPCPASS" "devpass")
 DEBUG=$(set_default "$DEBUG" "debug")
 NETWORK=$(set_default "$NETWORK" "simnet")
 CHAIN=$(set_default "$CHAIN" "bitcoin")
+HOST=$(set_default "$HOST" "localhost")
 BACKEND="btcd"
 if [[ "$CHAIN" == "litecoin" ]]; then
     BACKEND="ltcd"
@@ -56,7 +57,7 @@ exec lnd \
     "--$CHAIN.$NETWORK" \
     "--$CHAIN.node"="btcd" \
     "--$BACKEND.rpccert"="/rpc/rpc.cert" \
-    "--$BACKEND.rpchost"="localhost" \
+    "--$BACKEND.rpchost"="$HOST" \
     "--$BACKEND.rpcuser"="$RPCUSER" \
     "--$BACKEND.rpcpass"="$RPCPASS" \
     --debuglevel="$DEBUG" \

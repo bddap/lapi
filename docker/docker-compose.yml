@@ -39,9 +39,10 @@ services:
         environment:
           - RPCUSER
           - RPCPASS
-          - NETWORK
+          - NETWORK=mainnet
           - CHAIN
           - DEBUG
+          - HOST=0.0.0.0
         volumes:
             - shared:/rpc
         entrypoint: ["./start-lnd.sh"]

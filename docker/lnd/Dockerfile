@@ -35,7 +35,7 @@ COPY --from=builder /go/bin/lncli /bin/
 COPY --from=builder /go/bin/lnd /bin/
 
 # Add bash.
-RUN /bin/sh -c "apk add --no-cache bash"
+RUN apk add --no-cache bash
 
 # Copy the entrypoint script.
 COPY "start-lnd.sh" .
