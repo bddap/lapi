@@ -20,11 +20,12 @@ mkdir -p $bitcoin_chain_storage
 # lnd runs the lightning node and communicates with btcd.
 # btcd runs a bitcoin node and hosts an rpc api for lnd to consume.
 cd $project_root/docker
-docker-compose run -d --name lnd lnd_btc
+docker-compose build lnd_btc # rebuild if necessary
+docker-compose up -d lnd_btc
 
 # create a directory in which to store lnd macaroons and tls certs
 # asser it does not already exist
 mkdir $project_root/lndauth
 
 # store macaroons and certs in directory
-docker exec lnd tar -cOC /root/.lnd . | tar -xC $project_root/lndauth
+docker exec lnd_btc tar -cOC /root/.lnd . | tar -xC $project_root/lndauth

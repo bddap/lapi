@@ -32,6 +32,8 @@ services:
         entrypoint: ["./start-btcctl.sh"]
 
     lnd:
+        ports:
+          - "10009:10009"
         image: lnd
         build:
           context: lnd
@@ -42,7 +44,6 @@ services:
           - NETWORK=mainnet
           - CHAIN
           - DEBUG
-          - HOST=0.0.0.0
         volumes:
             - shared:/rpc
         entrypoint: ["./start-lnd.sh"]

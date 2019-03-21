@@ -44,7 +44,6 @@ RPCPASS=$(set_default "$RPCPASS" "devpass")
 DEBUG=$(set_default "$DEBUG" "debug")
 NETWORK=$(set_default "$NETWORK" "simnet")
 CHAIN=$(set_default "$CHAIN" "bitcoin")
-HOST=$(set_default "$HOST" "localhost")
 BACKEND="btcd"
 if [[ "$CHAIN" == "litecoin" ]]; then
     BACKEND="ltcd"
@@ -53,11 +52,12 @@ fi
 exec lnd \
     --noseedbackup \
     --logdir="/data" \
+	--rpclisten="0.0.0.0" \
     "--$CHAIN.active" \
     "--$CHAIN.$NETWORK" \
     "--$CHAIN.node"="btcd" \
     "--$BACKEND.rpccert"="/rpc/rpc.cert" \
-    "--$BACKEND.rpchost"="$HOST" \
+    "--$BACKEND.rpchost"="blockchain" \
     "--$BACKEND.rpcuser"="$RPCUSER" \
     "--$BACKEND.rpcpass"="$RPCPASS" \
     --debuglevel="$DEBUG" \
