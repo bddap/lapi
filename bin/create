@@ -2,9 +2,30 @@
 
 set -euxo pipefail
 
-# make sure we are in the right directory
-cd "$(dirname "$0")"/..
+project_root=$(realpath $(dirname "$0")/..)
 
-cd lnd/docker
+bitcoin_chain_storage=/Volumes/btcchain/data
+mkdir -p $bitcoin_chain_storage
 
+# Mount docker volume for storage of bitcoin chain, this volume
+# is not destroyed by ./bin/destroy
+# docker volume create --driver local \
+# 	   --opt device=$bitcoin_chain_storage \
+# 	   --opt type=none \
+#      --opt o=bind \
+# 	   docker_bitcoin
+
+# Spin up a docker container running lnd.
+# A container named btcd will spin up as a side effect.
+# lnd runs the lightning node and communicates with btcd.
+# btcd runs a bitcoin node and hosts an rpc api for lnd to consume.
+cd $project_root/docker
 docker-compose run -d --name lnd lnd_btc
+docker-compose up -d lnd
+
+# create a directory in which to store lnd macaroons and tls certs
+# asser it does not already exist
+mkdir $project_root/lndauth
+
+# store macaroons and certs in directory
+docker exec lnd tar -cOC /root/.lnd . | tar -xC $project_root/lndauth
