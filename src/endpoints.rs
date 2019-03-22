@@ -27,6 +27,7 @@ impl<D: Db, L: LightningNode> Api<D, L> {
         &'a self,
         master: Master,
         invoice: Invoice,
+        fee: Fee<Satoshis>,
     ) -> impl Future<Item = (), Error = PayInvoiceError> + 'a {
         let amount = invoice
             .amount_pico_btc()
@@ -35,12 +36,12 @@ impl<D: Db, L: LightningNode> Api<D, L> {
         FutureResult::from(amount)
             .and_then(move |amount| {
                 self.database
-                    .begin_withdrawal(master, amount)
+                    .begin_withdrawal(master, amount, fee)
                     .map_err(PayInvoiceError::Begin)
             })
             .and_then(move |()| {
                 self.lighting_node
-                    .pay_invoice(invoice)
+                    .pay_invoice(invoice, fee)
                     .map_err(PayInvoiceError::Pay)
             })
             .and_then(move |paid_invoice| {
@@ -48,6 +49,8 @@ impl<D: Db, L: LightningNode> Api<D, L> {
                     .finish_withdrawal(paid_invoice)
                     .map_err(PayInvoiceError::Finish)
             })
+        // TODO, if invoice is never paid, refund balance to user account
+        // make sure invoice is not paid after balance is refunded
     }
 
     pub fn check_balance<'a>(

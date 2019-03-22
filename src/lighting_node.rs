@@ -6,16 +6,25 @@ pub trait LightningNode {
     fn create_invoice(&self, satoshis: Satoshis) -> FutureResult<Invoice, CreateInvoiceError>;
 
     /// Send to invoice. If invoice does not specfy an amount, return a PayError.
-    fn pay_invoice(&self, invoice: Invoice) -> FutureResult<PaidInvoice, PayError>;
+    fn pay_invoice(
+        &self,
+        invoice: Invoice,
+        max_fee: Fee<Satoshis>,
+    ) -> FutureResult<PaidInvoice, PayError>;
 }
 
 #[derive(Debug, Clone)]
 pub enum CreateInvoiceError {
-    /// Payment amount exeeded 2^64-1 pico-btc.
+    /// Payment amount exeeded what we can handle.
     TooLarge,
+    Network,
 }
 
 #[derive(Debug, Clone)]
 pub enum PayError {
     NoAmount,
+    Overflow,
+    Network,
+    PreimageNoMatch, // We can probaly assume lnd will never let this happen.
+    Unknown(String), // TODO, enumerate payment fialure modes, remove String, remove Unknown variant
 }

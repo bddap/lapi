@@ -32,8 +32,17 @@ impl LightningNode for FakeLightningNode {
             .into()
     }
 
-    fn pay_invoice(&self, invoice: Invoice) -> FutureResult<PaidInvoice, PayError> {
+    fn pay_invoice(
+        &self,
+        invoice: Invoice,
+        max_fee: Fee<Satoshis>,
+    ) -> FutureResult<PaidInvoice, PayError> {
         // Yup, looks paid to me.
-        Ok(PaidInvoice(invoice)).into()
+        Ok(PaidInvoice {
+            invoice,
+            preimage: U256::zero(),
+            fees_paid: max_fee / Fee(Satoshis(2)),
+        })
+        .into()
     }
 }

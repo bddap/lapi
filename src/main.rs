@@ -8,6 +8,8 @@ mod invoice;
 mod lighting_node;
 mod lnd_client;
 mod satoshis;
+mod semantics;
+mod u256;
 
 fn main() {
     println!("Hello, world!");

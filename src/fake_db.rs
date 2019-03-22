@@ -18,6 +18,7 @@ impl Db for FakeDb {
         &self,
         master: Master,
         amount: Satoshis,
+        fee: Fee<Satoshis>,
     ) -> FutureResult<(), BeginWithdrawalError> {
         self.0.lock().unwrap().begin_withdrawal(master, amount)
     }
@@ -42,7 +43,17 @@ impl Db for FakeDb {
 struct FakeDbInner {
     balances: BTreeMap<Lesser, Satoshis>,
     history: BTreeMap<PaymentHash, (Lesser, Invoice, InvoiceStatus)>,
-    withdrawals_in_progress: BTreeMap<PaymentHash, (Invoice, Lesser)>,
+    withdrawals_in_progress: BTreeMap<PaymentHash, Withdrawal>,
+}
+
+struct Withdrawal {
+    // The invoice being paid.
+    invoice: Invoice,
+    // Sender
+    account: Lesser,
+    // The fee that we deducted from the senders when starting this witdrawal.
+    // Some of this may be refunded later if the actual fee was less than expected.
+    fee: Fee<Satoshis>,
 }
 
 impl FakeDbInner {
@@ -51,7 +62,7 @@ impl FakeDbInner {
         lesser: Lesser,
         invoice: Invoice,
     ) -> FutureResult<Invoice, StoreInvoiceError> {
-        let invoice_uuid = invoice_uuid(&invoice);
+        let invoice_uuid = PaymentHash::from_invoice(&invoice);
         match self.history.insert(
             invoice_uuid.clone(),
             (lesser, invoice.clone(), InvoiceStatus::Unpaid),
@@ -94,9 +105,12 @@ impl FakeDbInner {
         invoice: PaidInvoice,
     ) -> FutureResult<(), FinishWithdrawalError> {
         self.withdrawals_in_progress
-            .remove(&invoice_uuid(&invoice.0))
+            .remove(&PaymentHash::from_invoice(&invoice.invoice))
             .ok_or(FinishWithdrawalError::WithdrawalNotInProgress)
-            .map(|_| ())
+            .map(|withdrawal| {
+                // Refund change to account for unused fees
+                let change: Fee<Satoshis> = withdrawal.fee - invoice.fees_paid;
+            })
             .into()
     }
 
@@ -115,7 +129,7 @@ impl FakeDbInner {
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
         let lesser: Lesser = middle.into();
         self.history
-            .get(&invoice_uuid(&invoice))
+            .get(&PaymentHash(payment_hash(&invoice)))
             .and_then(|(entry_lesser, _invoice, status)| {
                 if lesser == *entry_lesser {
                     Some(status)
@@ -127,5 +141,28 @@ impl FakeDbInner {
             .ok_or(CheckInvoiceStatusError::InvoiceDoesNotExist)
             .map(Clone::clone)
             .into()
+    }
+
+    fn add_to_balance(&mut self, lesser: Lesser, amount: Satoshis) -> Result<(), Overflow> {
+        if !self.balances.contains_key(&lesser) {
+            self.balances.insert(lesser.clone(), Satoshis(0));
+        }
+        let mut balance = self.balances.get_mut(&lesser).unwrap();
+        let new_balance = balance.checked_add(&amount).ok_or(Overflow)?;
+        *balance = new_balance;
+        debug_assert_eq!(self.balances.get(&lesser).unwrap(), &new_balance);
+        Ok(())
+    }
+}
+
+struct Overflow;
+
+/// Serves as a UUID for an invoice. Used to associate an invoice with a Lesser.
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone)]
+struct PaymentHash(U256);
+
+impl PaymentHash {
+    fn from_invoice(invoice: &Invoice) -> PaymentHash {
+        PaymentHash(payment_hash(invoice))
     }
 }

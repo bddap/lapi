@@ -1,6 +1,5 @@
 use crate::common::*;
 use futures::future::FutureResult;
-use std::collections::BTreeMap;
 
 pub trait Db {
     fn store_unpaid_invoice(
@@ -13,6 +12,7 @@ pub trait Db {
         &self,
         master: Master,
         amount: Satoshis,
+        fee: Fee<Satoshis>,
     ) -> FutureResult<(), BeginWithdrawalError>;
 
     fn finish_withdrawal(&self, invoice: PaidInvoice) -> FutureResult<(), FinishWithdrawalError>;
@@ -43,6 +43,8 @@ pub enum BeginWithdrawalError {
 #[derive(Debug, Clone)]
 pub enum FinishWithdrawalError {
     WithdrawalNotInProgress,
+    // Numeric overflow when refunding unused fees to account
+    Overflow,
 }
 
 #[derive(Debug, Clone)]
