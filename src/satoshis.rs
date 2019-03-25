@@ -36,7 +36,7 @@ impl Satoshis {
 
 pub struct Withdrawal(pub Satoshis);
 
-/// Returned when converting from pico-btc to satoshi when pico-btc is not a multiple of 10000.
+/// When converting from pico-btc to satoshi, pico-btc was not a multiple of 10000.
 #[derive(Debug, Clone)]
 pub struct NotDivisible;
 

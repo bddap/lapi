@@ -23,6 +23,7 @@ pub enum CreateInvoiceError {
 #[derive(Debug, Clone)]
 pub enum PayError {
     NoAmount,
+    /// Payment + Fee was too large to process
     Overflow,
     Network,
     PreimageNoMatch, // We can probaly assume lnd will never let this happen.

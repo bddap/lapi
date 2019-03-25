@@ -62,10 +62,9 @@ impl<D: Db, L: LightningNode> Api<D, L> {
 
     pub fn check_invoice_status<'a>(
         &'a self,
-        middle: Middle,
-        invoice: Invoice,
+        payment_hash: U256,
     ) -> impl Future<Item = InvoiceStatus, Error = CheckInvoiceStatusError> + 'a {
-        self.database.check_invoice_status(middle, invoice)
+        self.database.check_invoice_status(payment_hash)
     }
 }
 

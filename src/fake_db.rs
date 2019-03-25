@@ -33,10 +33,9 @@ impl Db for FakeDb {
 
     fn check_invoice_status(
         &self,
-        middle: Middle,
-        invoice: Invoice,
+        payment_hash: U256,
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
-        self.0.lock().unwrap().check_invoice_status(middle, invoice)
+        self.0.lock().unwrap().check_invoice_status(payment_hash)
     }
 }
 
@@ -124,20 +123,11 @@ impl FakeDbInner {
 
     pub fn check_invoice_status(
         &mut self,
-        middle: Middle,
-        invoice: Invoice,
+        payment_hash: U256,
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
-        let lesser: Lesser = middle.into();
         self.history
-            .get(&PaymentHash(payment_hash(&invoice)))
-            .and_then(|(entry_lesser, _invoice, status)| {
-                if lesser == *entry_lesser {
-                    Some(status)
-                } else {
-                    // User is looking up an invoice that they do not own. Act like the invoice does not exits.
-                    None
-                }
-            })
+            .get(&PaymentHash(payment_hash))
+            .map(|(_entry_lesser, _invoice, status)| status)
             .ok_or(CheckInvoiceStatusError::InvoiceDoesNotExist)
             .map(Clone::clone)
             .into()

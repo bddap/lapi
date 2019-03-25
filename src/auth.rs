@@ -12,13 +12,15 @@ use crate::common::U256;
 #[derive(Clone, Copy)]
 pub struct Master(U256);
 
-/// Middle can veiw balance, and check invoice status.
+/// Middle can veiw balance
 #[derive(Clone, Copy)]
 pub struct Middle(U256);
 
 /// Lesser is not secret. It can generate an invoice.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Lesser(U256);
+
+/// Anyone can check invoice status if they have the 256 bit payment-hash for the invoice.
 
 impl Master {
     fn random() -> Master {

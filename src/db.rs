@@ -21,8 +21,7 @@ pub trait Db {
 
     fn check_invoice_status(
         &self,
-        middle: Middle,
-        invoice: Invoice,
+        payment_hash: U256,
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError>;
 }
 
@@ -43,7 +42,7 @@ pub enum BeginWithdrawalError {
 #[derive(Debug, Clone)]
 pub enum FinishWithdrawalError {
     WithdrawalNotInProgress,
-    // Numeric overflow when refunding unused fees to account
+    /// Numeric overflow when refunding unused fees to account
     Overflow,
 }
 
@@ -55,6 +54,6 @@ pub enum CheckBalanceError {
 
 #[derive(Debug, Clone)]
 pub enum CheckInvoiceStatusError {
-    /// This invoice was never generated for the user in question.
+    /// This invoice was never generated
     InvoiceDoesNotExist,
 }
