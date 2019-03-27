@@ -41,10 +41,6 @@ impl U256 {
     pub fn zero() -> U256 {
         U256([0; 32])
     }
-
-    pub fn from_array(other: [u8; 32]) -> Self {
-        U256(other)
-    }
 }
 
 impl Display for U256 {

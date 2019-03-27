@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 //   "lesser": "<hex u256>",
 //   "satoshis": <integer>
 // }
-// -> { "error": "to_large" }
+// -> { "error": { "to_large": null } }
 //  | { "ok": {
 //      "invoice": "<bech32 invoice>",
 //      "extras": {
@@ -26,7 +26,7 @@ pub type GenerateInvoiceResponse = ResultSerDe<GenerateInvoiceOk, GenerateInvoic
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum GenerateInvoiceErr {
-    ToLarge,
+    ToLarge(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -50,7 +50,7 @@ pub struct GenerateInvoiceExtras {
 // }
 // -> { "error": { "not_divisible": null }
 //             | { "overflow": null }
-//             | { "insufficeint_balance": null }
+//             | { "insufficient_balance": null }
 //             | { "no_balance": null }
 //    }
 //  | { "ok": { "fees_paid_satoshis": <uint> } }
@@ -61,37 +61,37 @@ pub struct PayInvoiceRequest {
     pub fee_satoshis: Satoshis,
 }
 
-pub type PayInvoiceResponse = Result<PayInvoiceOk, PayInvoiceErr>;
+pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum PayInvoiceErr {
-    NotDivisible,
-    Overflow,
-    InsufficientBalance,
-    NoBalance,
+    NotDivisible(()),
+    Overflow(()),
+    InsufficientBalance(()),
+    NoBalance(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PayInvoiceOk {
-    pub fees_paid_satoshis: u64,
+    pub fees_paid_satoshis: Satoshis,
 }
 
 // GET
 // /balance/<middle: hex u256>
 // -> { "error": { "no_balance": null } }
 //  | { "ok": { "balance_satoshis": <uint> } }
-pub type CheckBalanceResponse = Result<CheckBalanceOk, CheckBalanceErr>;
+pub type CheckBalanceResponse = ResultSerDe<CheckBalanceOk, CheckBalanceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckBalanceErr {
-    NoBalance,
+    NoBalance(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct CheckBalanceOk {
-    pub balance_satoshis: u64,
+    pub balance_satoshis: Satoshis,
 }
 
 // GET
@@ -100,19 +100,19 @@ pub struct CheckBalanceOk {
 //  | { "ok": { "waiting": null }
 //          | { "preimage": "<hex u256>" }
 //    }
-pub type CheckInvoiceResponse = Result<CheckInvoiceOk, CheckInvoiceErr>;
+pub type CheckInvoiceResponse = ResultSerDe<CheckInvoiceOk, CheckInvoiceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckInvoiceErr {
-    Expired,
-    NonExistent,
+    Expired(()),
+    NonExistent(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckInvoiceOk {
-    Waiting,
+    Waiting(()),
     Preimage(U256),
 }
 
@@ -121,7 +121,7 @@ pub enum CheckInvoiceOk {
 // /invoice/<payment hash: hex u256>
 // -> { "error": { "expired": null } | { "non_existent": null } }
 //  | { "ok": { "preimage": "<hex u256>" } }
-pub type AwaitInvoiceResponse = Result<AwaitInvoiceOk, CheckInvoiceErr>;
+pub type AwaitInvoiceResponse = ResultSerDe<AwaitInvoiceOk, CheckInvoiceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct AwaitInvoiceOk {
@@ -169,8 +169,8 @@ mod test {
             },
         );
         ser_de_equiv::<GenerateInvoiceResponse>(
-            json!({ "error": "to_large" }),
-            Err(GenerateInvoiceErr::ToLarge).into(),
+            json!({ "error": { "to_large": null } }),
+            Err(GenerateInvoiceErr::ToLarge(())).into(),
         );
         ser_de_equiv::<GenerateInvoiceResponse>(
             json!({
@@ -203,12 +203,6 @@ mod test {
         .unwrap_err();
     }
 
-    // -> { "error": { "not_divisible": null }
-    //             | { "overflow": null }
-    //             | { "insufficeint_balance": null }
-    //             | { "no_balance": null }
-    //    }
-    //  | { "ok": { "fees_paid_satoshis": <uint> } }
     #[test]
     fn post_pay() {
         ser_de_equiv(
@@ -223,24 +217,85 @@ mod test {
                 fee_satoshis: Satoshis(30),
             },
         );
-        unimplemented!()
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "error": { "not_divisible": null } }),
+            Err(PayInvoiceErr::NotDivisible(())).into(),
+        );
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "error": { "overflow": null } }),
+            Err(PayInvoiceErr::Overflow(())).into(),
+        );
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "error": { "insufficient_balance": null } }),
+            Err(PayInvoiceErr::InsufficientBalance(())).into(),
+        );
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "error": { "no_balance": null } }),
+            Err(PayInvoiceErr::NoBalance(())).into(),
+        );
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "ok": { "fees_paid_satoshis": 10 } }),
+            Ok(PayInvoiceOk {
+                fees_paid_satoshis: Satoshis(10),
+            })
+            .into(),
+        );
+        from_value::<PayInvoiceResponse>(json!({ "ok": { "fees_paid_satoshis": -10 } }))
+            .unwrap_err();
+        from_value::<PayInvoiceResponse>(json!({ "err": "fees_paid_satoshis" })).unwrap_err();
     }
 
-    // GET
-    // /balance/<middle: hex u256>
-    // -> { "error": { "no_balance": null } }
-    //  | { "ok": { "balance_satoshis": <uint> } }
+    #[test]
+    fn get_balance() {
+        ser_de_equiv::<CheckBalanceResponse>(
+            json!({ "error": { "no_balance": null } }),
+            Err(CheckBalanceErr::NoBalance(())).into(),
+        );
+        ser_de_equiv::<CheckBalanceResponse>(
+            json!({ "ok": { "balance_satoshis": 0 } }),
+            Ok(CheckBalanceOk {
+                balance_satoshis: Satoshis(0),
+            })
+            .into(),
+        );
+    }
 
-    // GET
-    // /invoice/<payment hash: hex u256>
-    // -> { "error": { "expired": null } | { "non_existent": null } }
-    //  | { "ok": { "waiting": null }
-    //          | { "preimage": "<hex u256>" }
-    //    }
+    #[test]
+    fn get_invoice() {
+        ser_de_equiv::<CheckInvoiceResponse>(
+            json!({ "error": { "expired": null } }),
+            Err(CheckInvoiceErr::Expired(())).into(),
+        );
+        ser_de_equiv::<CheckInvoiceResponse>(
+            json!({ "error": { "non_existent": null } }),
+            Err(CheckInvoiceErr::NonExistent(())).into(),
+        );
+        ser_de_equiv::<CheckInvoiceResponse>(
+            json!({ "ok": { "waiting": null } }),
+            Ok(CheckInvoiceOk::Waiting(())).into(),
+        );
+        ser_de_equiv::<CheckInvoiceResponse>(
+            json!({ "ok": { "preimage": VALID_U256_A } }),
+            Ok(CheckInvoiceOk::Preimage(TYPED_U256_A)).into(),
+        );
+    }
 
-    // GET
-    // Upgrade: websocket
-    // /invoice/<payment hash: hex u256>
-    // -> { "error": { "expired": null } | { "non_existent": null } }
-    //  | { "ok": { "preimage": "<hex u256>" } }
+    #[test]
+    fn await_invoice() {
+        ser_de_equiv::<AwaitInvoiceResponse>(
+            json!({ "error": { "expired": null } }),
+            Err(CheckInvoiceErr::Expired(())).into(),
+        );
+        ser_de_equiv::<AwaitInvoiceResponse>(
+            json!({ "error": { "non_existent": null } }),
+            Err(CheckInvoiceErr::NonExistent(())).into(),
+        );
+        ser_de_equiv::<AwaitInvoiceResponse>(
+            json!({ "ok": { "preimage": VALID_U256_A } }),
+            Ok(AwaitInvoiceOk {
+                preimage: TYPED_U256_A,
+            })
+            .into(),
+        );
+    }
 }
