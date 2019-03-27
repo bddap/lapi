@@ -2,9 +2,9 @@ use crate::common::*;
 use futures::future::FutureResult;
 use futures::Future;
 
-struct Api<D: Db, L: LightningNode> {
-    database: D,
-    lighting_node: L,
+pub struct Api<D: Db, L: LightningNode> {
+    pub database: D,
+    pub lighting_node: L,
 }
 
 impl<D: Db, L: LightningNode> Api<D, L> {
@@ -88,7 +88,7 @@ mod test {
     use rand::{thread_rng, Rng};
 
     fn gen_auth() -> (Master, Middle, Lesser) {
-        let master: Master = thread_rng().gen();
+        let master: Master = Master::random();
         let middle: Middle = master.into();
         let lesser: Lesser = middle.into();
         (master, middle, lesser)
@@ -103,7 +103,9 @@ mod test {
     fn pay_invoice<D: Db, L: LightningNode>(api: Api<D, L>) {
         let (master, middle, lesser) = gen_auth();
         let invoice = api.generate_invoice(lesser, Satoshis(1)).wait().unwrap();
-        api.pay_invoice(master, invoice).wait().unwrap();
+        api.pay_invoice(master, invoice, Fee(Satoshis(10)))
+            .wait()
+            .unwrap();
     }
 
     fn check_balance<D: Db, L: LightningNode>(api: Api<D, L>) {

@@ -1,6 +1,7 @@
 use crate::common::*;
 pub use lightning_invoice::{Invoice, Sha256};
 use lightning_invoice::{ParseOrSemanticError, SignedRawInvoice};
+use serde::{Deserialize, Serialize, Serializer};
 use std::borrow::Borrow;
 
 #[derive(Clone)]

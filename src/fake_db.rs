@@ -5,6 +5,17 @@ use std::sync::Mutex;
 
 pub struct FakeDb(Mutex<FakeDbInner>);
 
+impl FakeDb {
+    pub fn new() -> FakeDb {
+        let inner = FakeDbInner {
+            balances: BTreeMap::new(),
+            history: BTreeMap::new(),
+            withdrawals_in_progress: BTreeMap::new(),
+        };
+        FakeDb(Mutex::new(inner))
+    }
+}
+
 impl Db for FakeDb {
     fn store_unpaid_invoice(
         &self,

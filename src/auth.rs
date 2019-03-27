@@ -7,23 +7,24 @@
 //! of funds from le's invoices.
 
 use crate::common::U256;
+use serde::{Deserialize, Serialize};
 
-/// Master has total control. Master can send funds.
-#[derive(Clone, Copy)]
-pub struct Master(U256);
+/// Master can send funds.
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
+pub struct Master(pub U256);
 
 /// Middle can veiw balance
-#[derive(Clone, Copy)]
-pub struct Middle(U256);
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
+pub struct Middle(pub U256);
 
 /// Lesser is not secret. It can generate an invoice.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Lesser(U256);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Debug)]
+pub struct Lesser(pub U256);
 
 /// Anyone can check invoice status if they have the 256 bit payment-hash for the invoice.
 
 impl Master {
-    fn random() -> Master {
+    pub fn random() -> Master {
         Master(U256::random())
     }
 }

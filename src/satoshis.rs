@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{Div, Sub};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Satoshis(pub u64);
 
 impl Satoshis {
@@ -51,5 +52,19 @@ impl Sub for Satoshis {
     type Output = Self;
     fn sub(self, other: Self) -> Satoshis {
         Satoshis(self.0.sub(other.0))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json::{from_value, json, to_value};
+
+    #[test]
+    fn serde_as_expected() {
+        assert_eq!(json!(9023), to_value(Satoshis(9023)).unwrap());
+        assert_eq!(Satoshis(23235), from_value(json!(23235)).unwrap());
+        from_value::<Satoshis>(json!("534")).unwrap_err();
+        from_value::<Satoshis>(json!([1, 2, 2, 2])).unwrap_err();
     }
 }
