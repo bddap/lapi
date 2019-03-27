@@ -19,9 +19,9 @@ impl FakeDb {
 impl Db for FakeDb {
     fn store_unpaid_invoice(
         &self,
-        lesser: Lesser,
-        invoice: Invoice,
-    ) -> FutureResult<Invoice, StoreInvoiceError> {
+        lesser: &Lesser,
+        invoice: &Invoice,
+    ) -> FutureResult<(), StoreInvoiceError> {
         self.0.lock().unwrap().store_unpaid_invoice(lesser, invoice)
     }
 
@@ -34,7 +34,7 @@ impl Db for FakeDb {
         self.0.lock().unwrap().begin_withdrawal(master, amount)
     }
 
-    fn finish_withdrawal(&self, invoice: PaidInvoice) -> FutureResult<(), FinishWithdrawalError> {
+    fn finish_withdrawal(&self, invoice: &PaidInvoice) -> FutureResult<(), FinishWithdrawalError> {
         self.0.lock().unwrap().finish_withdrawal(invoice)
     }
 
@@ -69,24 +69,27 @@ struct Withdrawal {
 impl FakeDbInner {
     pub fn store_unpaid_invoice(
         &mut self,
-        lesser: Lesser,
-        invoice: Invoice,
-    ) -> FutureResult<Invoice, StoreInvoiceError> {
+        lesser: &Lesser,
+        invoice: &Invoice,
+    ) -> FutureResult<(), StoreInvoiceError> {
         let invoice_uuid = PaymentHash::from_invoice(&invoice);
         match self.history.insert(
             invoice_uuid.clone(),
-            (lesser, invoice.clone(), InvoiceStatus::Unpaid),
+            (lesser.clone(), invoice.clone(), InvoiceStatus::Unpaid),
         ) {
-            None => {} // Good, there was no entry in the map for this invoice.
+            None => Ok(()), // Good, there was no entry in the map for this invoice.
             Some(old_value) => {
                 // Bad news, we are re-inserting an invoice that was already logged.
                 // It should not be possible for this to happen. We have a bug.
                 // replace the old value and return an error
                 self.history.insert(invoice_uuid, old_value);
-                return Err(StoreInvoiceError::EntryAlreadyExists).into();
+                Err(StoreInvoiceError::EntryAlreadyExists(
+                    lesser.clone(),
+                    invoice.clone(),
+                ))
             }
         }
-        Ok(invoice).into()
+        .into()
     }
 
     pub fn begin_withdrawal(
@@ -112,7 +115,7 @@ impl FakeDbInner {
     /// Withdawal is confirmed complete.
     pub fn finish_withdrawal(
         &mut self,
-        invoice: PaidInvoice,
+        invoice: &PaidInvoice,
     ) -> FutureResult<(), FinishWithdrawalError> {
         self.withdrawals_in_progress
             .remove(&PaymentHash::from_invoice(&invoice.invoice))

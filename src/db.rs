@@ -4,9 +4,9 @@ use futures::future::FutureResult;
 pub trait Db {
     fn store_unpaid_invoice(
         &self,
-        lesser: Lesser,
-        invoice: Invoice,
-    ) -> FutureResult<Invoice, StoreInvoiceError>;
+        lesser: &Lesser,
+        invoice: &Invoice,
+    ) -> FutureResult<(), StoreInvoiceError>;
 
     fn begin_withdrawal(
         &self,
@@ -15,7 +15,7 @@ pub trait Db {
         fee: Fee<Satoshis>,
     ) -> FutureResult<(), BeginWithdrawalError>;
 
-    fn finish_withdrawal(&self, invoice: PaidInvoice) -> FutureResult<(), FinishWithdrawalError>;
+    fn finish_withdrawal(&self, invoice: &PaidInvoice) -> FutureResult<(), FinishWithdrawalError>;
 
     fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError>;
 
@@ -28,7 +28,17 @@ pub trait Db {
 #[derive(Debug, Clone)]
 pub enum StoreInvoiceError {
     /// Invoice has already been stored.
-    EntryAlreadyExists,
+    EntryAlreadyExists(Lesser, Invoice),
+}
+
+impl ServerError for StoreInvoiceError {
+    fn into_log_err(self) -> LogErr {
+        match self {
+            StoreInvoiceError::EntryAlreadyExists(lesser, invoice) => {
+                LogErr::DbStoreInvoiceDuplicate(lesser, invoice)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

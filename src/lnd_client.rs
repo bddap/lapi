@@ -93,9 +93,9 @@ impl LightningNode for (LightningClient, MacaroonData) {
             .drop_metadata()
             .wait();
         response
-            .map_err(|err| CreateInvoiceError::Network)
+            .map_err(|grpc_err| CreateInvoiceError::Network(format!("{:?}", grpc_err)))
             .and_then(|response: AddInvoiceResponse| {
-                parse_bolt11(&response.payment_request).map_err(|err| CreateInvoiceError::Network)
+                parse_bolt11(&response.payment_request).map_err(CreateInvoiceError::InvalidInvoice)
             })
             .into()
     }
@@ -165,7 +165,7 @@ impl LightningNode for (LightningClient, MacaroonData) {
                 Ok(PaidInvoice {
                     fees_paid: fake_fees,
                     invoice,
-                    preimage,
+                    preimage: Preimage(preimage),
                 })
             })
             .wait()

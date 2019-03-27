@@ -1,5 +1,6 @@
 use crate::common::*;
 use futures::future::FutureResult;
+use lightning_invoice::ParseOrSemanticError;
 
 pub trait LightningNode {
     /// Generate a unique invoice for n satoshis.
@@ -17,7 +18,25 @@ pub trait LightningNode {
 pub enum CreateInvoiceError {
     /// Payment amount exeeded what we can handle.
     TooLarge,
-    Network,
+    /// Backend specific network error description.
+    Network(String),
+    /// Backend created an invoice, but it was not valid.
+    InvalidInvoice(ParseOrSemanticError),
+}
+
+impl MaybeServerError for CreateInvoiceError {
+    type NotServerError = crate::api_types::GenerateInvoiceErr;
+    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
+        match self {
+            CreateInvoiceError::TooLarge => LoggedOr::UnLogged(GenerateInvoiceErr::ToLarge(())),
+            CreateInvoiceError::Network(err) => {
+                LoggedOr::log(log, LogErr::InvoiceCreateNetwork(err))
+            }
+            CreateInvoiceError::InvalidInvoice(err) => {
+                LoggedOr::log(log, LogErr::InvalidInvoiceCreated(err))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

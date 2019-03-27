@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{Div, Sub};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Fee<T>(pub T);
 
 impl<T: Div<Output = T>> Div for Fee<T> {

@@ -40,7 +40,7 @@ impl LightningNode for FakeLightningNode {
         // Yup, looks paid to me.
         Ok(PaidInvoice {
             invoice,
-            preimage: U256::zero(),
+            preimage: Preimage(U256::zero()),
             fees_paid: max_fee / Fee(Satoshis(2)),
         })
         .into()

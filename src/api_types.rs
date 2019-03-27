@@ -58,7 +58,7 @@ pub struct GenerateInvoiceExtras {
 pub struct PayInvoiceRequest {
     pub master: Master,
     pub invoice: InvoiceSerDe,
-    pub fee_satoshis: Satoshis,
+    pub fee_satoshis: Fee<Satoshis>,
 }
 
 pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
@@ -74,7 +74,7 @@ pub enum PayInvoiceErr {
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PayInvoiceOk {
-    pub fees_paid_satoshis: Satoshis,
+    pub fees_paid_satoshis: Fee<Satoshis>,
 }
 
 // GET
@@ -214,7 +214,7 @@ mod test {
             PayInvoiceRequest {
                 master: Master(TYPED_U256_A),
                 invoice: InvoiceSerDe(VALID_INVOICE_A.parse().unwrap()),
-                fee_satoshis: Satoshis(30),
+                fee_satoshis: Fee(Satoshis(30)),
             },
         );
         ser_de_equiv::<PayInvoiceResponse>(
@@ -236,7 +236,7 @@ mod test {
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "ok": { "fees_paid_satoshis": 10 } }),
             Ok(PayInvoiceOk {
-                fees_paid_satoshis: Satoshis(10),
+                fees_paid_satoshis: Fee(Satoshis(10)),
             })
             .into(),
         );

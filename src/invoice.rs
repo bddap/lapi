@@ -13,7 +13,7 @@ pub enum InvoiceStatus {
 pub struct PaidInvoice {
     pub invoice: Invoice,
     // hash(preimage) == invoice.payment_hash()
-    pub preimage: U256,
+    pub preimage: Preimage,
     pub fees_paid: Fee<Satoshis>,
 }
 

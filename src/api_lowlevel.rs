@@ -2,12 +2,12 @@ use crate::common::*;
 use futures::future::FutureResult;
 use futures::Future;
 
-pub struct Api<D: Db, L: LightningNode> {
+pub struct ApiLow<D: Db, L: LightningNode> {
     pub database: D,
     pub lighting_node: L,
 }
 
-impl<D: Db, L: LightningNode> Api<D, L> {
+impl<D: Db, L: LightningNode> ApiLow<D, L> {
     pub fn generate_invoice<'a>(
         &'a self,
         lesser: Lesser,
@@ -16,10 +16,12 @@ impl<D: Db, L: LightningNode> Api<D, L> {
         self.lighting_node
             .create_invoice(satoshis)
             .map_err(GenerateInvoiceError::Create)
-            .and_then(move |untracked_invoice| {
+            .and_then(move |invoice| {
+                // If the database is unable to store the invoice, we don't return it.
                 self.database
-                    .store_unpaid_invoice(lesser, untracked_invoice)
+                    .store_unpaid_invoice(&lesser, &invoice)
                     .map_err(GenerateInvoiceError::Store)
+                    .map(|()| invoice)
             })
     }
 
@@ -28,7 +30,7 @@ impl<D: Db, L: LightningNode> Api<D, L> {
         master: Master,
         invoice: Invoice,
         fee: Fee<Satoshis>,
-    ) -> impl Future<Item = (), Error = PayInvoiceError> + 'a {
+    ) -> impl Future<Item = PaidInvoice, Error = PayInvoiceError> + 'a {
         let amount = invoice
             .amount_pico_btc()
             .ok_or(PayInvoiceError::Pay(PayError::NoAmount))
@@ -46,7 +48,8 @@ impl<D: Db, L: LightningNode> Api<D, L> {
             })
             .and_then(move |paid_invoice| {
                 self.database
-                    .finish_withdrawal(paid_invoice)
+                    .finish_withdrawal(&paid_invoice)
+                    .map(|()| paid_invoice)
                     .map_err(PayInvoiceError::Finish)
             })
         // TODO, if invoice is never paid, refund balance to user account
@@ -94,13 +97,13 @@ mod test {
         (master, middle, lesser)
     }
 
-    fn generate_invoice<D: Db, L: LightningNode>(api: Api<D, L>) {
+    fn generate_invoice<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         api.generate_invoice(gen_auth().2, Satoshis(1))
             .wait()
             .unwrap();
     }
 
-    fn pay_invoice<D: Db, L: LightningNode>(api: Api<D, L>) {
+    fn pay_invoice<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         let (master, middle, lesser) = gen_auth();
         let invoice = api.generate_invoice(lesser, Satoshis(1)).wait().unwrap();
         api.pay_invoice(master, invoice, Fee(Satoshis(10)))
@@ -108,13 +111,13 @@ mod test {
             .unwrap();
     }
 
-    fn check_balance<D: Db, L: LightningNode>(api: Api<D, L>) {
+    fn check_balance<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         // assert lesser has no balance
         // pay invoice of n satoshis to lesser
         // assert lesser has n balance
     }
 
-    fn check_invoice_status<D: Db, L: LightningNode>(api: Api<D, L>) {
+    fn check_invoice_status<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         // assert lesser balance is Nonexistent
         // create invoice for n satoshis with lesser target
         // assert invoice status NonExistent
@@ -125,7 +128,7 @@ mod test {
         // assert balance for lesser is n
     }
 
-    fn check_invoice_status_duo<D: Db, L: LightningNode>(api: Api<D, L>) {
+    fn check_invoice_status_duo<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         // create two users, A and B
         // assert {A,B}lesser balance is Nonexistent
         // create Ainvoice for n satoshis with Alesser target
