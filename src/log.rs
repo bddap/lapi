@@ -18,6 +18,15 @@ pub enum LogErr {
     /// https://github.com/rust-bitcoin/rust-lightning-invoice/issues/30
     InvalidInvoiceCreated(ParseOrSemanticError),
     DbStoreInvoiceDuplicate(Lesser, Invoice),
+    InvoicePayUnknown(String), // This variant must be removed before deploying to production.
+    FinishWithdrawalError(FinishWithdrawalError),
+    /// Invoice was paid, but the hash(preimage) != payment_hash backends such as lnd are expected
+    /// to guard against this.
+    PayPreimageNoMatch {
+        outgoing_paid_invoice: PaidInvoiceOutgoing,
+    },
+    /// This variant must be removed before deploying to production.
+    CheckInvoiceStatusUnknown(String),
 }
 
 /// This type is not constructable outside this file.
@@ -38,13 +47,7 @@ pub enum LoggedOr<T> {
 impl<T> LoggedOr<T> {
     /// Helper function. Log error to log and return a LoggedOr::Logged
     pub fn log<L: Log>(log: &L, err: LogErr) -> LoggedOr<T> {
-        log.err(err).into()
-    }
-}
-
-impl<T> From<ErrLogged> for LoggedOr<T> {
-    fn from(other: ErrLogged) -> Self {
-        LoggedOr::Logged(other)
+        LoggedOr::Logged(log.err(err))
     }
 }
 

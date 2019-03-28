@@ -17,6 +17,7 @@
 - [ ] Allow api client to provide hash preimage when generating an invoice
 - [ ] endpoints::Api should contain a structured error logger. When a server error is
       encountered, http 500 should be returned and the error logged to logger.
+- [ ] Consider tracking multiple payments to a single invoice
 
 # Build setup 🤮
 

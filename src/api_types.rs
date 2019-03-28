@@ -38,7 +38,7 @@ pub struct GenerateInvoiceOk {
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct GenerateInvoiceExtras {
     pub qr: UrlSerDe,
-    pub payment_hash: U256,
+    pub payment_hash: PaymentHash,
 }
 
 // POST
@@ -66,7 +66,11 @@ pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum PayInvoiceErr {
+    /// Provided invoice did not specify an amount
+    NoAmount(()),
     NotDivisible(()),
+    AmountTooLarge(()),
+    FeeTooLarge(()),
     Overflow(()),
     InsufficientBalance(()),
     NoBalance(()),
@@ -74,6 +78,7 @@ pub enum PayInvoiceErr {
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PayInvoiceOk {
+    pub preimage: Preimage,
     pub fees_paid_satoshis: Fee<Satoshis>,
 }
 
@@ -113,7 +118,10 @@ pub enum CheckInvoiceErr {
 #[serde(rename_all = "snake_case")]
 pub enum CheckInvoiceOk {
     Waiting(()),
-    Preimage(U256),
+    Paid {
+        preimage: Preimage,
+        amount_paid_satoshis: Satoshis,
+    },
 }
 
 // GET

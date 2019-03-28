@@ -18,6 +18,4 @@ warp = "0.1.14"
 url = "1.7.2"
 serde = { version = "1", features = ["derive"] }
 hex = "0.3.2"
-
-[dev-dependencies]
 serde_json = "1"

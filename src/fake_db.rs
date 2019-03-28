@@ -34,7 +34,10 @@ impl Db for FakeDb {
         self.0.lock().unwrap().begin_withdrawal(master, amount)
     }
 
-    fn finish_withdrawal(&self, invoice: &PaidInvoice) -> FutureResult<(), FinishWithdrawalError> {
+    fn finish_withdrawal(
+        &self,
+        invoice: &PaidInvoiceOutgoing,
+    ) -> FutureResult<(), FinishWithdrawalError> {
         self.0.lock().unwrap().finish_withdrawal(invoice)
     }
 
@@ -115,11 +118,11 @@ impl FakeDbInner {
     /// Withdawal is confirmed complete.
     pub fn finish_withdrawal(
         &mut self,
-        invoice: &PaidInvoice,
+        invoice: &PaidInvoiceOutgoing,
     ) -> FutureResult<(), FinishWithdrawalError> {
         self.withdrawals_in_progress
-            .remove(&PaymentHash::from_invoice(&invoice.invoice))
-            .ok_or(FinishWithdrawalError::WithdrawalNotInProgress)
+            .remove(&PaymentHash::from_invoice(&invoice.paid_invoice.invoice))
+            .ok_or_else(|| FinishWithdrawalError::WithdrawalNotInProgress(invoice.clone()))
             .map(|withdrawal| {
                 // Refund change to account for unused fees
                 let change: Fee<Satoshis> = withdrawal.fee - invoice.fees_paid;
@@ -167,6 +170,6 @@ struct PaymentHash(U256);
 
 impl PaymentHash {
     fn from_invoice(invoice: &Invoice) -> PaymentHash {
-        PaymentHash(payment_hash(invoice))
+        PaymentHash(get_payment_hash(invoice))
     }
 }

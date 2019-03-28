@@ -30,20 +30,23 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
         master: Master,
         invoice: Invoice,
         fee: Fee<Satoshis>,
-    ) -> impl Future<Item = PaidInvoice, Error = PayInvoiceError> + 'a {
+    ) -> impl Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + 'a {
         let amount = invoice
             .amount_pico_btc()
-            .ok_or(PayInvoiceError::Pay(PayError::NoAmount))
-            .and_then(|pico| Satoshis::from_pico_btc(pico).map_err(PayInvoiceError::Convert));
+            .ok_or(PayInvoiceError::NoAmount)
+            .and_then(|pico| {
+                Satoshis::from_pico_btc(pico).map_err(|NotDivisible| PayInvoiceError::NotDivisible)
+            });
         FutureResult::from(amount)
             .and_then(move |amount| {
                 self.database
                     .begin_withdrawal(master, amount, fee)
                     .map_err(PayInvoiceError::Begin)
+                    .map(move |()| amount)
             })
-            .and_then(move |()| {
+            .and_then(move |amount| {
                 self.lighting_node
-                    .pay_invoice(invoice, fee)
+                    .pay_invoice(invoice, amount, fee)
                     .map_err(PayInvoiceError::Pay)
             })
             .and_then(move |paid_invoice| {
@@ -65,7 +68,7 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
 
     pub fn check_invoice_status<'a>(
         &'a self,
-        payment_hash: U256,
+        payment_hash: PaymentHash,
     ) -> impl Future<Item = InvoiceStatus, Error = CheckInvoiceStatusError> + 'a {
         self.database.check_invoice_status(payment_hash)
     }
@@ -79,7 +82,16 @@ pub enum GenerateInvoiceError {
 
 #[derive(Debug, Clone)]
 pub enum PayInvoiceError {
-    Convert(NotDivisible),
+    /// Amount was not provided
+    NoAmount,
+    /// Amount was a non-integer number of satoshis
+    NotDivisible,
+    /// unpaid_amount + unpaid_fee > MAX
+    OverFlow {
+        unpaid_invoice: Invoice,
+        unpaid_amount: Satoshis,
+        unpaid_fee: Fee<Satoshis>,
+    },
     Begin(BeginWithdrawalError),
     Pay(PayError),
     Finish(FinishWithdrawalError),

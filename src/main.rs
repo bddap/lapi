@@ -12,6 +12,7 @@ mod invoice;
 mod lighting_node;
 mod lnd_client;
 mod log;
+mod payment_hash;
 mod preimage;
 mod satoshis;
 mod semantics;
@@ -20,5 +21,6 @@ mod u256;
 mod webserver;
 
 fn main() {
-    webserver::serve().unwrap()
+    let result = webserver::serve();
+    println!("{:#?}", result);
 }

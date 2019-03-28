@@ -6,18 +6,26 @@ use std::borrow::Borrow;
 
 #[derive(Clone)]
 pub enum InvoiceStatus {
-    Paid,
+    Paid(PaidInvoice),
     Unpaid,
 }
 
+#[derive(Debug, Clone)]
 pub struct PaidInvoice {
     pub invoice: Invoice,
     // hash(preimage) == invoice.payment_hash()
     pub preimage: Preimage,
+    pub amount_paid: Satoshis,
+}
+
+#[derive(Debug, Clone)]
+pub struct PaidInvoiceOutgoing {
+    pub paid_invoice: PaidInvoice,
+    pub fees_offered: Fee<Satoshis>,
     pub fees_paid: Fee<Satoshis>,
 }
 
-pub fn payment_hash(invoice: &Invoice) -> U256 {
+pub fn get_payment_hash(invoice: &Invoice) -> U256 {
     let sl: &[u8] = invoice.payment_hash().0.borrow();
     debug_assert_eq!(sl.len(), 32);
     U256::try_from_slice(sl).unwrap()

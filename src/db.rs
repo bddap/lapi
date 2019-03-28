@@ -15,7 +15,10 @@ pub trait Db {
         fee: Fee<Satoshis>,
     ) -> FutureResult<(), BeginWithdrawalError>;
 
-    fn finish_withdrawal(&self, invoice: &PaidInvoice) -> FutureResult<(), FinishWithdrawalError>;
+    fn finish_withdrawal(
+        &self,
+        invoice: &PaidInvoiceOutgoing,
+    ) -> FutureResult<(), FinishWithdrawalError>;
 
     fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError>;
 
@@ -51,9 +54,14 @@ pub enum BeginWithdrawalError {
 
 #[derive(Debug, Clone)]
 pub enum FinishWithdrawalError {
-    WithdrawalNotInProgress,
+    WithdrawalNotInProgress(PaidInvoiceOutgoing),
     /// Numeric overflow when refunding unused fees to account
-    Overflow,
+    /// current_balance + refund_amount > MAX
+    Overflow {
+        account: Lesser,
+        current_balance: Satoshis,
+        refund_amount: Satoshis,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -66,4 +74,6 @@ pub enum CheckBalanceError {
 pub enum CheckInvoiceStatusError {
     /// This invoice was never generated
     InvoiceDoesNotExist,
+    /// Network error occured while checking db
+    Unknown(String), // TODO, remove this generic error in favor of other, more concrete errors
 }

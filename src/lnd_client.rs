@@ -103,16 +103,24 @@ impl LightningNode for (LightningClient, MacaroonData) {
     fn pay_invoice(
         &self,
         invoice: Invoice,
+        amount: Satoshis,
         max_fee: Fee<Satoshis>,
-    ) -> FutureResult<PaidInvoice, PayError> {
-        let (client, macaroon) = self;
-        let payment_request: String = to_bolt11(&invoice);
+    ) -> FutureResult<PaidInvoiceOutgoing, PayError> {
+        let iamount = match amount.checked_to_i64() {
+            Some(i) => i,
+            None => {
+                return Err(PayError::AmountTooLarge).into();
+            }
+        };
         let imax_fee = match max_fee.0.checked_to_i64() {
             Some(i) => i,
             None => {
-                return Err(PayError::Overflow).into();
+                return Err(PayError::FeeTooLarge).into();
             }
         };
+
+        let (client, macaroon) = self;
+        let payment_request: String = to_bolt11(&invoice);
         let fee_limit = Some(FeeLimit {
             limit: Some(FeeLimit_oneof_limit::fixed(imax_fee)),
             ..Default::default()
@@ -121,8 +129,8 @@ impl LightningNode for (LightningClient, MacaroonData) {
         let request = SendRequest {
             dest: Default::default(),
             dest_string: Default::default(), // Lnd needs to infer this from the payment_request,
-            amt: -1,                         // Lnd needs to infer this from the payment_request
-            payment_hash: payment_hash(&invoice).to_vec(),
+            amt: iamount,
+            payment_hash: get_payment_hash(&invoice).to_vec(),
             payment_hash_string: Default::default(), // This field expects a hex_encoded version.
             payment_request,
             final_cltv_delta: Default::default(), // TODO, figure out what this means, verify using a default value is appropriate.
@@ -138,7 +146,7 @@ impl LightningNode for (LightningClient, MacaroonData) {
                 request,
             )
             .drop_metadata()
-            .map_err(|err| PayError::Network)
+            .map_err(|err| PayError::Unknown(format!("{:?}", err)))
             .and_then(|response: SendResponse| {
                 let SendResponse {
                     payment_error,
@@ -155,18 +163,28 @@ impl LightningNode for (LightningClient, MacaroonData) {
                 debug_assert_eq!(phash.len(), 32);
                 debug_assert_eq!(
                     U256::try_from_slice(&phash).unwrap(),
-                    payment_hash(&invoice)
+                    get_payment_hash(&invoice)
                 );
-                if preimage.hash() != payment_hash(&invoice) {
-                    return Err(PayError::PreimageNoMatch);
-                }
                 // TODO: get actual fees spent on invoice
+                let expected_payment_hash = get_payment_hash(&invoice);
                 let fake_fees = Fee(Satoshis(u64::max_value()));
-                Ok(PaidInvoice {
-                    fees_paid: fake_fees,
+                let paid_invoice = PaidInvoice {
                     invoice,
                     preimage: Preimage(preimage),
-                })
+                    amount_paid: amount,
+                };
+                let paid_invoice_outgoing = PaidInvoiceOutgoing {
+                    paid_invoice,
+                    fees_offered: max_fee,
+                    fees_paid: fake_fees,
+                };
+                if preimage.hash() != expected_payment_hash {
+                    Err(PayError::PreimageNoMatch {
+                        outgoing_paid_invoice: paid_invoice_outgoing,
+                    })
+                } else {
+                    Ok(paid_invoice_outgoing)
+                }
             })
             .wait()
             .into()

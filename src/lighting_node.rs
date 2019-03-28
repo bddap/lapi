@@ -10,8 +10,9 @@ pub trait LightningNode {
     fn pay_invoice(
         &self,
         invoice: Invoice,
+        amount: Satoshis,
         max_fee: Fee<Satoshis>,
-    ) -> FutureResult<PaidInvoice, PayError>;
+    ) -> FutureResult<PaidInvoiceOutgoing, PayError>;
 }
 
 #[derive(Debug, Clone)]
@@ -41,10 +42,10 @@ impl MaybeServerError for CreateInvoiceError {
 
 #[derive(Debug, Clone)]
 pub enum PayError {
-    NoAmount,
-    /// Payment + Fee was too large to process
-    Overflow,
-    Network,
-    PreimageNoMatch, // We can probaly assume lnd will never let this happen.
-    Unknown(String), // TODO, enumerate payment fialure modes, remove String, remove Unknown variant
+    AmountTooLarge,
+    FeeTooLarge,
+    PreimageNoMatch {
+        outgoing_paid_invoice: PaidInvoiceOutgoing,
+    }, // We can probaly assume lnd will never let this happen.
+    Unknown(String), // TODO, enumerate payment failure modes, remove String, remove Unknown variant
 }
