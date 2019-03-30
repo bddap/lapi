@@ -13,7 +13,10 @@ pub trait Log: Sync + Send {
 
 #[derive(Debug, Clone)]
 pub enum LogErr {
-    InvoiceCreateNetwork(String),
+    InvoiceCreateNetwork {
+        backend_name: String,
+        err: String,
+    },
     /// ParseOrSemanticError is not currently [de]serializable.
     /// https://github.com/rust-bitcoin/rust-lightning-invoice/issues/30
     InvalidInvoiceCreated(ParseOrSemanticError),

@@ -20,7 +20,7 @@ pub enum CreateInvoiceError {
     /// Payment amount exeeded what we can handle.
     TooLarge,
     /// Backend specific network error description.
-    Network(String),
+    Network { backend_name: String, err: String },
     /// Backend created an invoice, but it was not valid.
     InvalidInvoice(ParseOrSemanticError),
 }
@@ -30,8 +30,8 @@ impl MaybeServerError for CreateInvoiceError {
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
             CreateInvoiceError::TooLarge => LoggedOr::UnLogged(GenerateInvoiceErr::ToLarge(())),
-            CreateInvoiceError::Network(err) => {
-                LoggedOr::log(log, LogErr::InvoiceCreateNetwork(err))
+            CreateInvoiceError::Network { backend_name, err } => {
+                LoggedOr::log(log, LogErr::InvoiceCreateNetwork { backend_name, err })
             }
             CreateInvoiceError::InvalidInvoice(err) => {
                 LoggedOr::log(log, LogErr::InvalidInvoiceCreated(err))

@@ -19,6 +19,8 @@ use std::{
     sync::Arc,
 };
 
+const BACKEND_NAME: &str = "lnd";
+
 pub fn init_lightning_client(
     tls_cert: &Path,
     macaroon: &Path,
@@ -93,7 +95,10 @@ impl LightningNode for (LightningClient, MacaroonData) {
             .drop_metadata()
             .wait();
         response
-            .map_err(|grpc_err| CreateInvoiceError::Network(format!("{:?}", grpc_err)))
+            .map_err(|grpc_err| CreateInvoiceError::Network {
+                backend_name: BACKEND_NAME.to_owned(),
+                err: format!("{:?}", grpc_err),
+            })
             .and_then(|response: AddInvoiceResponse| {
                 parse_bolt11(&response.payment_request).map_err(CreateInvoiceError::InvalidInvoice)
             })
