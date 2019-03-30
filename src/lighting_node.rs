@@ -2,7 +2,7 @@ use crate::common::*;
 use futures::future::FutureResult;
 use lightning_invoice::ParseOrSemanticError;
 
-pub trait LightningNode {
+pub trait LightningNode: Sync + Send {
     /// Generate a unique invoice for n satoshis.
     fn create_invoice(&self, satoshis: Satoshis) -> FutureResult<Invoice, CreateInvoiceError>;
 

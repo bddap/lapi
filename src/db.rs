@@ -1,7 +1,7 @@
 use crate::common::*;
 use futures::future::FutureResult;
 
-pub trait Db {
+pub trait Db: Sync + Send {
     fn store_unpaid_invoice(
         &self,
         lesser: &Lesser,

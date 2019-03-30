@@ -103,7 +103,10 @@ pub struct CheckBalanceOk {
 // /invoice/<payment hash: hex u256>
 // -> { "error": { "expired": null } | { "non_existent": null } }
 //  | { "ok": { "waiting": null }
-//          | { "preimage": "<hex u256>" }
+//          | { "paid": {
+//                "preimage": "<hex u256>",
+//                "amount_paid_satoshis": <uint>
+//            }
 //    }
 pub type CheckInvoiceResponse = ResultSerDe<CheckInvoiceOk, CheckInvoiceErr>;
 
@@ -242,9 +245,13 @@ mod test {
             Err(PayInvoiceErr::NoBalance(())).into(),
         );
         ser_de_equiv::<PayInvoiceResponse>(
-            json!({ "ok": { "fees_paid_satoshis": 10 } }),
+            json!({ "ok": {
+                "fees_paid_satoshis": 10,
+                "preimage": VALID_U256_A,
+            } }),
             Ok(PayInvoiceOk {
                 fees_paid_satoshis: Fee(Satoshis(10)),
+                preimage: Preimage(TYPED_U256_A),
             })
             .into(),
         );
@@ -283,8 +290,17 @@ mod test {
             Ok(CheckInvoiceOk::Waiting(())).into(),
         );
         ser_de_equiv::<CheckInvoiceResponse>(
-            json!({ "ok": { "preimage": VALID_U256_A } }),
-            Ok(CheckInvoiceOk::Preimage(TYPED_U256_A)).into(),
+            json!({ "ok": {
+                "paid": {
+                    "preimage": VALID_U256_A,
+                    "amount_paid_satoshis": 11
+                }
+            }}),
+            Ok(CheckInvoiceOk::Paid {
+                preimage: Preimage(TYPED_U256_A),
+                amount_paid_satoshis: Satoshis(11),
+            })
+            .into(),
         );
     }
 

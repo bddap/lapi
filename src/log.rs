@@ -2,7 +2,7 @@ use crate::common::*;
 use lightning_invoice::ParseOrSemanticError;
 use serde::{Deserialize, Serialize};
 
-pub trait Log {
+pub trait Log: Sync + Send {
     fn _err(&self, err: LogErr);
 
     fn err(&self, err: LogErr) -> ErrLogged {
