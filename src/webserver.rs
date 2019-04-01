@@ -102,6 +102,7 @@ mod test {
         0xf1, 0x49, 0x60, 0x8e, 0x34, 0x96, 0x8c, 0x1f, 0xf1, 0x5f, 0xb9, 0xf1, 0x83, 0xde, 0x5c,
         0x40, 0x00,
     ]));
+    const DEFAULT_FEE: Fee<Satoshis> = Fee(Satoshis(10));
 
     macro_rules! server {
         () => (impl Filter<Extract = (impl Reply,), Error = Rejection> + 'static)
@@ -145,16 +146,30 @@ mod test {
             satoshis: Satoshis(amount as u64),
         };
         let resp: GenerateInvoiceResponse = post(server, "/invoice", request);
-        let res: Result<_, _> = resp.into();
-        res.unwrap()
+        Into::<Result<_, _>>::into(resp).unwrap()
     }
 
     fn check_balance(server: &server!(), middle: Middle) -> CheckBalanceResponse {
         unimplemented!()
     }
 
-    fn pay(server: &server!(), invoice: Invoice, master: Master) -> PayInvoiceResponse {
-        unimplemented!()
+    fn pay(
+        server: &server!(),
+        invoice: Invoice,
+        amount: Satoshis,
+        master: Master,
+    ) -> Result<PayInvoiceOk, PayInvoiceErr> {
+        let resp: PayInvoiceResponse = post(
+            server,
+            "/pay",
+            PayInvoiceRequest {
+                master,
+                invoice: InvoiceSerDe(invoice),
+                amount_satoshis: amount,
+                fee_satoshis: DEFAULT_FEE,
+            },
+        );
+        Into::<Result<_, _>>::into(resp)
     }
 
     #[test]
@@ -168,7 +183,7 @@ mod test {
         let invoice = new_invoice(&server, 1, b.into()).invoice.0;
 
         // pay invoice from account A
-        pay(&server, invoice, ACCOUNT_A);
+        pay(&server, invoice, Satoshis(1), ACCOUNT_A).unwrap();
 
         // check B balance is 1 sat
         let bal: Result<_, _> = check_balance(&server, b.into()).into();
@@ -181,8 +196,21 @@ mod test {
     }
 
     #[test]
-    fn client_workflow() {}
+    fn client_workflow() {
+        unimplemented!()
+    }
 
     #[test]
-    fn await_invoice() {}
+    fn await_invoice() {
+        unimplemented!()
+    }
+
+    #[test]
+    fn fail_with_no_balance() {
+        let server = make_server();
+        let account_b = Master::random();
+        let invoice = new_invoice(&server, 0, account_b.into()).invoice.0;
+        let res = pay(&server, invoice, Satoshis(1), account_b);
+        assert_eq!(res, Err(PayInvoiceErr::NoBalance(())))
+    }
 }

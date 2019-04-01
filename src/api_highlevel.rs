@@ -31,10 +31,11 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
         let PayInvoiceRequest {
             master,
             invoice,
+            amount_satoshis,
             fee_satoshis,
         } = request;
         self.api_low
-            .pay_invoice(master, invoice.0, fee_satoshis)
+            .pay_invoice(master, invoice.0, amount_satoshis, fee_satoshis)
             .map(Into::into) // convert PaidInvoice to PayInvoiceOk
             .then(move |res| to_user_result(res, &self.log))
             .map(Into::into) // convert Result<_, _> to ResultSerDe<_, _>

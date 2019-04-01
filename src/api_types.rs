@@ -46,10 +46,10 @@ pub struct GenerateInvoiceExtras {
 // {
 //   "master": "<hex u256>",
 //   "invoice": "<bech32 invoice>",
+//   "amount_satoshis": <uint>,
 //   "fee_satoshis": <uint>
 // }
-// -> { "error": { "not_divisible": null }
-//             | { "overflow": null }
+// -> { "error": { "overflow": null }
 //             | { "insufficient_balance": null }
 //             | { "no_balance": null }
 //    }
@@ -58,6 +58,7 @@ pub struct GenerateInvoiceExtras {
 pub struct PayInvoiceRequest {
     pub master: Master,
     pub invoice: InvoiceSerDe,
+    pub amount_satoshis: Satoshis,
     pub fee_satoshis: Fee<Satoshis>,
 }
 
@@ -67,8 +68,6 @@ pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
 #[serde(rename_all = "snake_case")]
 pub enum PayInvoiceErr {
     /// Provided invoice did not specify an amount
-    NoAmount(()),
-    NotDivisible(()),
     AmountTooLarge(()),
     FeeTooLarge(()),
     Overflow(()),
@@ -220,17 +219,15 @@ mod test {
             json!({
                 "master": VALID_U256_A,
                 "invoice": VALID_INVOICE_A,
+                "amount_satoshis": 30,
                 "fee_satoshis": 30
             }),
             PayInvoiceRequest {
                 master: Master(TYPED_U256_A),
                 invoice: InvoiceSerDe(VALID_INVOICE_A.parse().unwrap()),
+                amount_satoshis: Satoshis(30),
                 fee_satoshis: Fee(Satoshis(30)),
             },
-        );
-        ser_de_equiv::<PayInvoiceResponse>(
-            json!({ "error": { "not_divisible": null } }),
-            Err(PayInvoiceErr::NotDivisible(())).into(),
         );
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "error": { "overflow": null } }),

@@ -29,22 +29,13 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
         &'a self,
         master: Master,
         invoice: Invoice,
+        amount: Satoshis,
         fee: Fee<Satoshis>,
     ) -> impl Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + 'a {
-        let amount = invoice
-            .amount_pico_btc()
-            .ok_or(PayInvoiceError::NoAmount)
-            .and_then(|pico| {
-                Satoshis::from_pico_btc(pico).map_err(|NotDivisible| PayInvoiceError::NotDivisible)
-            });
-        FutureResult::from(amount)
-            .and_then(move |amount| {
-                self.database
-                    .begin_withdrawal(master, amount, fee)
-                    .map_err(PayInvoiceError::Begin)
-                    .map(move |()| amount)
-            })
-            .and_then(move |amount| {
+        self.database
+            .begin_withdrawal(master, amount, fee)
+            .map_err(PayInvoiceError::Begin)
+            .and_then(move |()| {
                 self.lighting_node
                     .pay_invoice(invoice, amount, fee)
                     .map_err(PayInvoiceError::Pay)
@@ -82,10 +73,6 @@ pub enum GenerateInvoiceError {
 
 #[derive(Debug, Clone)]
 pub enum PayInvoiceError {
-    /// Amount was not provided
-    NoAmount,
-    /// Amount was a non-integer number of satoshis
-    NotDivisible,
     /// unpaid_amount + unpaid_fee > MAX
     OverFlow {
         unpaid_invoice: Invoice,
@@ -118,7 +105,7 @@ mod test {
     fn pay_invoice<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         let (master, middle, lesser) = gen_auth();
         let invoice = api.generate_invoice(lesser, Satoshis(1)).wait().unwrap();
-        api.pay_invoice(master, invoice, Fee(Satoshis(10)))
+        api.pay_invoice(master, invoice, Satoshis(1), Fee(Satoshis(10)))
             .wait()
             .unwrap();
     }

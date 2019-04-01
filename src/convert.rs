@@ -23,8 +23,6 @@ impl MaybeServerError for PayInvoiceError {
     type NotServerError = PayInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
-            PayInvoiceError::NoAmount => PayInvoiceErr::NoAmount(()).into(),
-            PayInvoiceError::NotDivisible => PayInvoiceErr::NotDivisible(()).into(),
             PayInvoiceError::OverFlow {
                 unpaid_invoice,
                 unpaid_amount,
