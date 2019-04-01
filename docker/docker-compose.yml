@@ -9,8 +9,9 @@ services:
       build:
         context: btcd/
       volumes:
-        - shared:/rpc
-        - bitcoin:/data
+        - lappi_persist_btcd_rpc:/rpc
+        - lappi_persist_btcd_data:/root/.btcd/data
+        - lappi_persist_btcd_logs:/root/.btcd/logs
       environment:
         - RPCUSER
         - RPCPASS
@@ -23,13 +24,6 @@ services:
           - DEBUG
           - MINING_ADDRESS
         entrypoint: ["./start-btcd.sh"]
-
-    btcctl:
-        extends: btc
-        container_name: btcctl
-        links:
-            - "btcd:rpcserver"
-        entrypoint: ["./start-btcctl.sh"]
 
     lnd:
         ports:
@@ -45,7 +39,8 @@ services:
           - CHAIN
           - DEBUG
         volumes:
-            - shared:/rpc
+          - lappi_persist_btcd_rpc:/rpc
+          - lappi_persist_lnd_dir:/root/.lnd
         entrypoint: ["./start-lnd.sh"]
 
     lnd_btc:
@@ -55,16 +50,36 @@ services:
           - "btcd:blockchain"
 
 volumes:
-  # shared volume is needed to store the btcd rpc certificates and use it within
-  # btcctl and lnd containers.
-  shared:
-    driver: local
-
-  # bitcoin volume is needed for maintaining blockchain persistence
-  # during btcd container recreation.
-  bitcoin:
+  # These volumes point to hardcoded paths. This will need to be fixed before prod.
+  
+  # shared volume is needed to store the btcd rpc certificates for use from lnd
+  lappi_persist_btcd_rpc:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /Volumes/btcchain/data # temporary fix, TODO don't hard code
+      device: /Volumes/btcchain/persist/btcd_rpc
+
+  # Btc chain is stored here
+  lappi_persist_btcd_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/btcchain/persist/btcd_data
+
+  # Btc logs are stored here
+  lappi_persist_btcd_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/btcchain/persist/btcd_logs
+
+  # Lnd config lives here
+  lappi_persist_lnd_dir:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Volumes/btcchain/persist/lnd_dir

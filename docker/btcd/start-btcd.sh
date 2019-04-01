@@ -53,8 +53,8 @@ PARAMS=$(echo $PARAMS \
     "--debuglevel=$DEBUG" \
     "--rpcuser=$RPCUSER" \
     "--rpcpass=$RPCPASS" \
-    "--datadir=/data" \
-    "--logdir=/data" \
+    # "--datadir=/data" \
+    # "--logdir=/data" \
     "--rpccert=/rpc/rpc.cert" \
     "--rpckey=/rpc/rpc.key" \
     "--rpclisten=0.0.0.0" \
@@ -72,4 +72,3 @@ PARAMS="$PARAMS $@"
 # Print command and start bitcoin node.
 echo "Command: btcd $PARAMS"
 exec btcd $PARAMS
-
