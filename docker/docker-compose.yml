@@ -9,9 +9,7 @@ services:
       build:
         context: btcd/
       volumes:
-        - lappi_persist_btcd_rpc:/rpc
-        - lappi_persist_btcd_data:/root/.btcd/data
-        - lappi_persist_btcd_logs:/root/.btcd/logs
+        - lappi_persist_btcd:/root/.btcd
       environment:
         - RPCUSER
         - RPCPASS
@@ -39,8 +37,8 @@ services:
           - CHAIN
           - DEBUG
         volumes:
-          - lappi_persist_btcd_rpc:/rpc
-          - lappi_persist_lnd_dir:/root/.lnd
+          - lappi_persist_btcd:/root/.btcd
+          - lappi_persist_lnd:/root/.lnd
         entrypoint: ["./start-lnd.sh"]
 
     lnd_btc:
@@ -53,33 +51,17 @@ volumes:
   # These volumes point to hardcoded paths. This will need to be fixed before prod.
   
   # shared volume is needed to store the btcd rpc certificates for use from lnd
-  lappi_persist_btcd_rpc:
+  lappi_persist_lnd:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /Volumes/btcchain/persist/btcd_rpc
+      device: /Volumes/btcchain/persist/lnd
 
   # Btc chain is stored here
-  lappi_persist_btcd_data:
+  lappi_persist_btcd:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /Volumes/btcchain/persist/btcd_data
-
-  # Btc logs are stored here
-  lappi_persist_btcd_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /Volumes/btcchain/persist/btcd_logs
-
-  # Lnd config lives here
-  lappi_persist_lnd_dir:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /Volumes/btcchain/persist/lnd_dir
+      device: /Volumes/btcchain/persist/btcd

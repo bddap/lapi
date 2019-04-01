@@ -38,9 +38,10 @@ pub fn init_lightning_client(
 }
 
 pub fn init_default_lightning_client() -> Result<(LightningClient, MacaroonData), CreateError> {
+    // TODO, don't hardcode.
     init_lightning_client(
-        Path::new("lndauth/tls.cert"),
-        Path::new("lndauth/data/chain/bitcoin/mainnet/admin.macaroon"),
+        Path::new("/Volumes/btcchain/persist/lnd/tls.cert"),
+        Path::new("/Volumes/btcchain/persist/lnd/data/chain/bitcoin/mainnet/admin.macaroon"),
         SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 10009),
     )
 }
@@ -249,7 +250,6 @@ mod test {
 
     #[test]
     fn pay_invoice() {
-        let fake_node = FakeLightningNode {};
         let node = init_default_lightning_client().unwrap();
         node.create_invoice(Satoshis(10)).wait().unwrap();
     }

@@ -10,6 +10,3 @@ docker stop btcd || true
 docker rm btcd || true
 docker stop lnd_btc || true
 docker rm lnd_btc || true
-
-# remove old lnd auth directory if it exists
-rm -r lndauth || true
