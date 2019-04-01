@@ -21,7 +21,7 @@ pub use crate::{
         PaidInvoiceOutgoing,
     },
     lighting_node::{CreateInvoiceError, LightningNode, PayError},
-    lnd_client::{init_default_lightning_client, init_lightning_client, CreateError},
+    lnd_client::CreateError,
     log::{ErrLogged, Log, LogErr, LoggedOr, MaybeServerError, ServerError},
     payment_hash::PaymentHash,
     preimage::Preimage,

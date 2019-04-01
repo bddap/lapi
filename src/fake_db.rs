@@ -1,5 +1,5 @@
 use crate::common::*;
-use futures::future::FutureResult;
+use futures::{future::FutureResult, Future};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -162,7 +162,25 @@ impl FakeDbInner {
     }
 }
 
+#[derive(Debug)]
 struct Overflow;
+
+#[cfg(test)]
+/// Create a fake_db with a balance in test_util::ACCOUNT_A
+pub fn db_with_account_a_balance() -> FakeDb {
+    let db = FakeDb::new();
+    {
+        let middle = crate::test_util::ACCOUNT_A.into();
+        let lesser = crate::test_util::ACCOUNT_A.into();
+        let mut dbi = db.0.lock().unwrap();
+        assert_eq!(
+            dbi.check_balance(middle).wait(),
+            Err(CheckBalanceError::NoBalance)
+        );
+        dbi.add_to_balance(lesser, Satoshis(500)).unwrap();
+    }
+    db
+}
 
 /// Serves as a UUID for an invoice. Used to associate an invoice with a Lesser.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone)]

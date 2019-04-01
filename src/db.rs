@@ -64,7 +64,7 @@ pub enum FinishWithdrawalError {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CheckBalanceError {
     /// The account in question does not exist.
     NoBalance,

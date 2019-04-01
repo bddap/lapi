@@ -17,6 +17,7 @@ mod preimage;
 mod satoshis;
 mod semantics;
 mod ser_de;
+mod test_util;
 mod u256;
 mod webserver;
 

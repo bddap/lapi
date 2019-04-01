@@ -16,7 +16,8 @@ use warp::{
 pub fn serve() -> Result<(), ServeError> {
     let api_low = ApiLow {
         database: FakeDb::new(),
-        lighting_node: init_default_lightning_client().map_err(ServeError::Create)?,
+        lighting_node: crate::test_util::init_default_lightning_client()
+            .map_err(ServeError::Create)?,
     };
     let api_high = ApiHigh {
         api_low,
@@ -96,13 +97,7 @@ pub enum ServeError {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    const ACCOUNT_A: Master = Master(U256([
-        0xda, 0xbd, 0xf8, 0xc5, 0x74, 0xfb, 0x9a, 0x9e, 0x27, 0x72, 0x05, 0xe2, 0xda, 0x3d, 0x38,
-        0xf1, 0x49, 0x60, 0x8e, 0x34, 0x96, 0x8c, 0x1f, 0xf1, 0x5f, 0xb9, 0xf1, 0x83, 0xde, 0x5c,
-        0x40, 0x00,
-    ]));
-    const DEFAULT_FEE: Fee<Satoshis> = Fee(Satoshis(10));
+    use crate::test_util::*;
 
     macro_rules! server {
         () => (impl Filter<Extract = (impl Reply,), Error = Rejection> + 'static)

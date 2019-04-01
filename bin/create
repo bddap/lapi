@@ -11,3 +11,6 @@ project_root=$(realpath $(dirname "$0")/..)
 cd $project_root/docker
 docker-compose build lnd_btc # rebuild if necessary
 docker-compose up -d lnd_btc
+
+# prompt user for pass
+docker exec -it lnd_btc lncli unlock
