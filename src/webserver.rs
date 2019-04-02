@@ -103,9 +103,9 @@ mod test {
         () => (impl Filter<Extract = (impl Reply,), Error = Rejection> + 'static)
     }
 
-    fn make_server() -> server!() {
+    fn make_server_with_db<D: 'static + Db>(database: D) -> server!() {
         let api_low = ApiLow {
-            database: FakeDb::new(),
+            database,
             lighting_node: init_default_lightning_client().unwrap(),
         };
         let api_high = ApiHigh {
@@ -113,6 +113,10 @@ mod test {
             log: FakeLog,
         };
         server(api_high)
+    }
+
+    fn make_server() -> server!() {
+        make_server_with_db(FakeDb::new())
     }
 
     fn js<T: Serialize>(t: T) -> String {
@@ -135,6 +139,14 @@ mod test {
         sj(std::str::from_utf8(raw.body()).unwrap()).unwrap()
     }
 
+    fn get<R: DeserializeOwned>(server: &server!(), path: &str) -> R {
+        let raw = warp::test::request()
+            .path(path)
+            .method("POST")
+            .reply(server);
+        sj(std::str::from_utf8(raw.body()).unwrap()).unwrap()
+    }
+
     fn new_invoice(server: &server!(), amount: u8, lesser: Lesser) -> GenerateInvoiceOk {
         let request = GenerateInvoiceRequest {
             lesser,
@@ -150,7 +162,7 @@ mod test {
 
     fn pay(
         server: &server!(),
-        invoice: Invoice,
+        invoice: &Invoice,
         amount: Satoshis,
         master: Master,
     ) -> Result<PayInvoiceOk, PayInvoiceErr> {
@@ -159,7 +171,7 @@ mod test {
             "/pay",
             PayInvoiceRequest {
                 master,
-                invoice: InvoiceSerDe(invoice),
+                invoice: InvoiceSerDe(invoice.clone()),
                 amount_satoshis: amount,
                 fee_satoshis: DEFAULT_FEE,
             },
@@ -169,7 +181,7 @@ mod test {
 
     #[test]
     fn dev_workflow() {
-        let server = make_server();
+        let server = make_server_with_db(db_with_account_a_balance());
 
         // generate account B
         let b = Master::random();
@@ -178,7 +190,7 @@ mod test {
         let invoice = new_invoice(&server, 1, b.into()).invoice.0;
 
         // pay invoice from account A
-        pay(&server, invoice, Satoshis(1), ACCOUNT_A).unwrap();
+        pay(&server, &invoice, Satoshis(1), ACCOUNT_A).unwrap();
 
         // check B balance is 1 sat
         let bal: Result<_, _> = check_balance(&server, b.into()).into();
@@ -191,13 +203,107 @@ mod test {
     }
 
     #[test]
-    fn client_workflow() {
-        unimplemented!()
+    fn await_invoice() {
+        use std::thread;
+
+        let accnt_b = Master::random();
+        let server = make_server_with_db(db_with_account_a_balance());
+        let invoice = new_invoice(&server, 1, accnt_b.into()).invoice.0;
+        let accnt_a_lesser: Lesser = ACCOUNT_A.into();
+
+        // due to a limitation in warp::test, this line must come before wait_for_pay
+        // TODO test wait_for_pay, pay in the correct order
+        pay(&server, &invoice, Satoshis(2), ACCOUNT_A).unwrap();
+
+        let mut websocket = warp::test::ws()
+            .path(&format!("/invoice/{}", accnt_a_lesser))
+            .handshake(server)
+            .unwrap();
+        let wait_for_pay = thread::spawn(move || {
+            let resp_mesg = websocket.recv().unwrap();
+            let resp_str = resp_mesg.to_str().unwrap();
+            let resp: AwaitInvoiceResponse = sj(resp_str).unwrap();
+            let res: Result<_, _> = resp.into();
+            assert_eq!(
+                res,
+                Ok(AwaitInvoiceOk {
+                    preimage: U256::zero(),
+                    amount_paid_satoshis: Satoshis(2),
+                })
+            );
+            websocket.recv_closed().unwrap(); // assert ws is closed afterward
+        });
+
+        wait_for_pay.join().unwrap(); // assert websocket listen thread succeeded
+    }
+
+    fn get_invoice_status(
+        server: &server!(),
+        payment_hash: PaymentHash,
+    ) -> Result<CheckInvoiceOk, CheckInvoiceErr> {
+        let path = format!("/invoice/{}", payment_hash);
+        let res: CheckInvoiceResponse = get(server, &path);
+        res.into()
+    }
+
+    fn get_balance(server: &server!(), middle: Middle) -> Result<CheckBalanceOk, CheckBalanceErr> {
+        let path = format!("/balance/{}", middle);
+        let res: CheckBalanceResponse = get(server, &path);
+        res.into()
     }
 
     #[test]
-    fn await_invoice() {
-        unimplemented!()
+    fn get_invoice() {
+        let accnt_b = Master::random();
+        let server = make_server_with_db(db_with_account_a_balance());
+        let accnt_a_lesser: Lesser = ACCOUNT_A.into();
+
+        // gobbleygook payment hash is an error
+        assert_eq!(
+            get_invoice_status(&server, PaymentHash::random()),
+            Err(CheckInvoiceErr::NonExistent(()))
+        );
+
+        let invoice = new_invoice(&server, 1, accnt_b.into()).invoice.0;
+
+        // Waiting
+        assert_eq!(
+            get_invoice_status(&server, get_payment_hash(&invoice)),
+            Ok(CheckInvoiceOk::Waiting(()))
+        );
+
+        pay(&server, &invoice, Satoshis(2), ACCOUNT_A).unwrap();
+
+        // After payment assert paid
+        if let CheckInvoiceOk::Paid {
+            preimage,
+            amount_paid_satoshis,
+        } = get_invoice_status(&server, get_payment_hash(&invoice)).unwrap()
+        {
+            assert_eq!(preimage.hash(), get_payment_hash(&invoice));
+            assert_eq!(amount_paid_satoshis, Satoshis(2));
+        } else {
+            panic!()
+        }
+
+        assert_eq!(
+            get_balance(&server, accnt_b.into()),
+            Ok(CheckBalanceOk {
+                balance_satoshis: Satoshis(2)
+            })
+        );
+    }
+
+    #[test]
+    fn pay_to_self() {
+        let server = make_server_with_db(db_with_account_a_balance());
+        let balance_pre = get_balance(&server, ACCOUNT_A.into()).unwrap();
+        let invoice = new_invoice(&server, 1, ACCOUNT_A.into()).invoice.0;
+        pay(&server, &invoice, Satoshis(1), ACCOUNT_A).unwrap();
+        let balance_post = get_balance(&server, ACCOUNT_A.into()).unwrap();
+
+        // Assert payment hash match
+        unimplemented!();
     }
 
     #[test]
@@ -205,7 +311,7 @@ mod test {
         let server = make_server();
         let account_b = Master::random();
         let invoice = new_invoice(&server, 0, account_b.into()).invoice.0;
-        let res = pay(&server, invoice, Satoshis(1), account_b);
+        let res = pay(&server, &invoice, Satoshis(1), account_b);
         assert_eq!(res, Err(PayInvoiceErr::NoBalance(())))
     }
 }

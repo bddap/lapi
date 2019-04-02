@@ -7,7 +7,7 @@
 //! of funds from le's invoices.
 
 use crate::common::U256;
-use core::str::FromStr;
+use core::{fmt, str::FromStr};
 use serde::{Deserialize, Serialize};
 
 /// Master can send funds.
@@ -63,3 +63,17 @@ macro_rules! derive_from_str {
 derive_from_str!(Master, Master);
 derive_from_str!(Middle, Middle);
 derive_from_str!(Lesser, Lesser);
+
+macro_rules! derive_display {
+    ($typ:ty) => {
+        impl fmt::Display for $typ {
+            fn fmt(&self, fm: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                fmt::Display::fmt(&self.0, fm)
+            }
+        }
+    };
+}
+
+derive_display!(Master);
+derive_display!(Middle);
+derive_display!(Lesser);

@@ -33,6 +33,7 @@ pub enum GenerateInvoiceErr {
 pub struct GenerateInvoiceOk {
     pub invoice: InvoiceSerDe,
     pub extras: GenerateInvoiceExtras,
+    // TODO return preimage
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -130,12 +131,16 @@ pub enum CheckInvoiceOk {
 // Upgrade: websocket
 // /invoice/<payment hash: hex u256>
 // -> { "error": { "expired": null } | { "non_existent": null } }
-//  | { "ok": { "preimage": "<hex u256>" } }
+//  | { "ok": {
+//      "preimage": "<hex u256>",
+//      "amount_paid_satoshis": <uint>
+//    } }
 pub type AwaitInvoiceResponse = ResultSerDe<AwaitInvoiceOk, CheckInvoiceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct AwaitInvoiceOk {
     pub preimage: U256,
+    pub amount_paid_satoshis: Satoshis,
 }
 
 #[cfg(test)]
@@ -312,9 +317,13 @@ mod test {
             Err(CheckInvoiceErr::NonExistent(())).into(),
         );
         ser_de_equiv::<AwaitInvoiceResponse>(
-            json!({ "ok": { "preimage": VALID_U256_A } }),
+            json!({ "ok": {
+                "preimage": VALID_U256_A,
+                "amount_paid_satoshis": 2
+            } }),
             Ok(AwaitInvoiceOk {
                 preimage: TYPED_U256_A,
+                amount_paid_satoshis: Satoshis(2),
             })
             .into(),
         );
