@@ -3,6 +3,7 @@
 //! be handled by reporting a server error e.g. http 500.
 //! ApiHigh methods accept and return types defined in api_types.
 
+use crate::api_types;
 use crate::common::*;
 use futures::Future;
 
@@ -14,9 +15,9 @@ pub struct ApiHigh<D: Db, L: LightningNode, G: Log> {
 impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn generate_invoice<'a>(
         &'a self,
-        request: GenerateInvoiceRequest,
-    ) -> impl Future<Item = GenerateInvoiceResponse, Error = ErrLogged> + 'a {
-        let GenerateInvoiceRequest { lesser, satoshis } = request;
+        request: api_types::GenerateInvoiceRequest,
+    ) -> impl Future<Item = api_types::GenerateInvoiceResponse, Error = ErrLogged> + 'a {
+        let api_types::GenerateInvoiceRequest { lesser, satoshis } = request;
         self.api_low
             .generate_invoice(lesser, satoshis)
             .map(Into::into) // convert Invoice to GenerateInvoiceOk
@@ -26,9 +27,9 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
 
     pub fn pay_invoice<'a>(
         &'a self,
-        request: PayInvoiceRequest,
-    ) -> impl Future<Item = PayInvoiceResponse, Error = ErrLogged> + 'a {
-        let PayInvoiceRequest {
+        request: api_types::PayInvoiceRequest,
+    ) -> impl Future<Item = api_types::PayInvoiceResponse, Error = ErrLogged> + 'a {
+        let api_types::PayInvoiceRequest {
             master,
             invoice,
             amount_satoshis,
@@ -44,10 +45,10 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn check_balance<'a>(
         &'a self,
         middle: Middle,
-    ) -> impl Future<Item = CheckBalanceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::CheckBalanceResponse, Error = ErrLogged> + 'a {
         self.api_low
             .check_balance(middle)
-            .map(|balance_satoshis| CheckBalanceOk { balance_satoshis })
+            .map(|balance_satoshis| api_types::CheckBalanceOk { balance_satoshis })
             .then(move |res| to_user_result(res, &self.log))
             .map(Into::into) // convert Result<_, _> to ResultSerDe<_, _>
     }
@@ -55,7 +56,7 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn check_invoice_status<'a>(
         &'a self,
         payment_hash: PaymentHash,
-    ) -> impl Future<Item = CheckInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::CheckInvoiceResponse, Error = ErrLogged> + 'a {
         self.api_low
             .check_invoice_status(payment_hash)
             .map(Into::into) // convert InvoiceStatus to CheckInvoiceOk
@@ -66,9 +67,9 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn await_invoice_status<'a>(
         &'a self,
         payment_hash: PaymentHash,
-    ) -> impl Future<Item = AwaitInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::AwaitInvoiceResponse, Error = ErrLogged> + 'a {
         use futures::future::FutureResult;
-        let a: FutureResult<AwaitInvoiceResponse, ErrLogged> = unimplemented!();
+        let a: FutureResult<api_types::AwaitInvoiceResponse, ErrLogged> = unimplemented!();
         a
     }
 }

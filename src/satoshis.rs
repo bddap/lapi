@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::ops::{Div, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Satoshis(pub u64);
@@ -52,6 +52,20 @@ impl Sub for Satoshis {
     type Output = Self;
     fn sub(self, other: Self) -> Satoshis {
         Satoshis(self.0.sub(other.0))
+    }
+}
+
+impl Mul for Satoshis {
+    type Output = Self;
+    fn mul(self, other: Satoshis) -> Satoshis {
+        Satoshis(self.0.mul(other.0))
+    }
+}
+
+impl Add for Satoshis {
+    type Output = Self;
+    fn add(self, other: Self) -> Satoshis {
+        Satoshis(self.0.add(other.0))
     }
 }
 

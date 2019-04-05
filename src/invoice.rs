@@ -4,13 +4,13 @@ use lightning_invoice::{ParseOrSemanticError, SignedRawInvoice};
 use serde::{Deserialize, Serialize, Serializer};
 use std::borrow::Borrow;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum InvoiceStatus {
     Paid(PaidInvoice),
     Unpaid,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PaidInvoice {
     pub invoice: Invoice,
     // hash(preimage) == invoice.payment_hash()
@@ -18,7 +18,7 @@ pub struct PaidInvoice {
     pub amount_paid: Satoshis,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PaidInvoiceOutgoing {
     pub paid_invoice: PaidInvoice,
     pub fees_offered: Fee<Satoshis>,

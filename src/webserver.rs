@@ -97,6 +97,7 @@ pub enum ServeError {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::api_types::*;
     use crate::test_util::*;
 
     macro_rules! server {

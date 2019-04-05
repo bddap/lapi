@@ -1,15 +1,16 @@
+use crate::api_types;
 /// From and Into definitions for crate Types
 /// MaybeServerError definitions for crate Types
 use crate::common::*;
 use url::Url;
 
-impl From<Invoice> for GenerateInvoiceOk {
-    fn from(invoice: Invoice) -> GenerateInvoiceOk {
+impl From<Invoice> for api_types::GenerateInvoiceOk {
+    fn from(invoice: Invoice) -> api_types::GenerateInvoiceOk {
         let bolt11: String = to_bolt11(&invoice);
         let payment_hash = get_payment_hash(&invoice);
-        GenerateInvoiceOk {
+        api_types::GenerateInvoiceOk {
             invoice: InvoiceSerDe(invoice),
-            extras: GenerateInvoiceExtras {
+            extras: api_types::GenerateInvoiceExtras {
                 qr: UrlSerDe(
                     Url::parse(&format!("https://bech32.thum.pw/{}/qr.png", bolt11)).unwrap(),
                 ),
@@ -20,19 +21,19 @@ impl From<Invoice> for GenerateInvoiceOk {
 }
 
 impl MaybeServerError for PayInvoiceError {
-    type NotServerError = PayInvoiceErr;
+    type NotServerError = api_types::PayInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
             PayInvoiceError::OverFlow {
                 unpaid_invoice,
                 unpaid_amount,
                 unpaid_fee,
-            } => PayInvoiceErr::Overflow(()).into(),
+            } => api_types::PayInvoiceErr::Overflow(()).into(),
             PayInvoiceError::Begin(BeginWithdrawalError::InsufficeintBalance) => {
-                PayInvoiceErr::InsufficientBalance(()).into()
+                api_types::PayInvoiceErr::InsufficientBalance(()).into()
             }
             PayInvoiceError::Begin(BeginWithdrawalError::NoBalance) => {
-                PayInvoiceErr::NoBalance(()).into()
+                api_types::PayInvoiceErr::NoBalance(()).into()
             }
             PayInvoiceError::Pay(pay_err) => MaybeServerError::maybe_log(pay_err, log),
             PayInvoiceError::Finish(finish_withdrawal_error) => {
@@ -43,11 +44,11 @@ impl MaybeServerError for PayInvoiceError {
 }
 
 impl MaybeServerError for PayError {
-    type NotServerError = PayInvoiceErr;
+    type NotServerError = api_types::PayInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
-            PayError::AmountTooLarge => PayInvoiceErr::AmountTooLarge(()).into(),
-            PayError::FeeTooLarge => PayInvoiceErr::FeeTooLarge(()).into(),
+            PayError::AmountTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()).into(),
+            PayError::FeeTooLarge => api_types::PayInvoiceErr::FeeTooLarge(()).into(),
             PayError::PreimageNoMatch {
                 outgoing_paid_invoice,
             } => LoggedOr::Logged(log.err(LogErr::PayPreimageNoMatch {
@@ -67,7 +68,7 @@ impl<T> From<T> for LoggedOr<T> {
 }
 
 impl MaybeServerError for GenerateInvoiceError {
-    type NotServerError = GenerateInvoiceErr;
+    type NotServerError = api_types::GenerateInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
             GenerateInvoiceError::Create(create) => MaybeServerError::maybe_log(create, log),
@@ -76,7 +77,7 @@ impl MaybeServerError for GenerateInvoiceError {
     }
 }
 
-impl From<PaidInvoiceOutgoing> for PayInvoiceOk {
+impl From<PaidInvoiceOutgoing> for api_types::PayInvoiceOk {
     fn from(other: PaidInvoiceOutgoing) -> Self {
         let PaidInvoiceOutgoing {
             paid_invoice:
@@ -88,7 +89,7 @@ impl From<PaidInvoiceOutgoing> for PayInvoiceOk {
             fees_offered,
             fees_paid,
         } = other;
-        PayInvoiceOk {
+        api_types::PayInvoiceOk {
             preimage,
             fees_paid_satoshis: fees_paid,
         }
@@ -96,35 +97,39 @@ impl From<PaidInvoiceOutgoing> for PayInvoiceOk {
 }
 
 impl MaybeServerError for CheckBalanceError {
-    type NotServerError = CheckBalanceErr;
+    type NotServerError = api_types::CheckBalanceErr;
     fn maybe_log<L: Log>(self, _log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
-            CheckBalanceError::NoBalance => LoggedOr::UnLogged(CheckBalanceErr::NoBalance(())),
+            CheckBalanceError::NoBalance => {
+                LoggedOr::UnLogged(api_types::CheckBalanceErr::NoBalance(()))
+            }
         }
     }
 }
 
-impl From<InvoiceStatus> for CheckInvoiceOk {
+impl From<InvoiceStatus> for api_types::CheckInvoiceOk {
     fn from(other: InvoiceStatus) -> Self {
         match other {
             InvoiceStatus::Paid(PaidInvoice {
                 invoice,
                 preimage,
                 amount_paid,
-            }) => CheckInvoiceOk::Paid {
+            }) => api_types::CheckInvoiceOk::Paid {
                 preimage,
                 amount_paid_satoshis: amount_paid,
             },
-            InvoiceStatus::Unpaid => CheckInvoiceOk::Waiting(()),
+            InvoiceStatus::Unpaid => api_types::CheckInvoiceOk::Waiting(()),
         }
     }
 }
 
 impl MaybeServerError for CheckInvoiceStatusError {
-    type NotServerError = CheckInvoiceErr;
+    type NotServerError = api_types::CheckInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
-            CheckInvoiceStatusError::InvoiceDoesNotExist => CheckInvoiceErr::NonExistent(()).into(),
+            CheckInvoiceStatusError::InvoiceDoesNotExist => {
+                api_types::CheckInvoiceErr::NonExistent(()).into()
+            }
             CheckInvoiceStatusError::Unknown(string) => {
                 LoggedOr::Logged(log.err(LogErr::CheckInvoiceStatusUnknown(string)))
             }

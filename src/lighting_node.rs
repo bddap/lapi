@@ -29,7 +29,9 @@ impl MaybeServerError for CreateInvoiceError {
     type NotServerError = crate::api_types::GenerateInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
         match self {
-            CreateInvoiceError::TooLarge => LoggedOr::UnLogged(GenerateInvoiceErr::ToLarge(())),
+            CreateInvoiceError::TooLarge => {
+                LoggedOr::UnLogged(crate::api_types::GenerateInvoiceErr::ToLarge(()))
+            }
             CreateInvoiceError::Network { backend_name, err } => {
                 LoggedOr::log(log, LogErr::InvoiceCreateNetwork { backend_name, err })
             }

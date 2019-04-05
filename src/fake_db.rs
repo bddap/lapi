@@ -19,7 +19,7 @@ impl FakeDb {
 impl Db for FakeDb {
     fn store_unpaid_invoice(
         &self,
-        lesser: &Lesser,
+        lesser: Lesser,
         invoice: &Invoice,
     ) -> FutureResult<(), StoreInvoiceError> {
         self.0.lock().unwrap().store_unpaid_invoice(lesser, invoice)
@@ -72,7 +72,7 @@ struct Withdrawal {
 impl FakeDbInner {
     pub fn store_unpaid_invoice(
         &mut self,
-        lesser: &Lesser,
+        lesser: Lesser,
         invoice: &Invoice,
     ) -> FutureResult<(), StoreInvoiceError> {
         let invoice_uuid = PaymentHash::from_invoice(&invoice);

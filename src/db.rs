@@ -4,7 +4,7 @@ use futures::future::FutureResult;
 pub trait Db: Sync + Send {
     fn store_unpaid_invoice(
         &self,
-        lesser: &Lesser,
+        lesser: Lesser,
         invoice: &Invoice,
     ) -> FutureResult<(), StoreInvoiceError>;
 
@@ -28,7 +28,7 @@ pub trait Db: Sync + Send {
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum StoreInvoiceError {
     /// Invoice has already been stored.
     EntryAlreadyExists(Lesser, Invoice),
@@ -44,7 +44,7 @@ impl ServerError for StoreInvoiceError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BeginWithdrawalError {
     /// Not enough funds for withdrawl.
     InsufficeintBalance,
@@ -52,7 +52,7 @@ pub enum BeginWithdrawalError {
     NoBalance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FinishWithdrawalError {
     WithdrawalNotInProgress(PaidInvoiceOutgoing),
     /// Numeric overflow when refunding unused fees to account
@@ -64,13 +64,13 @@ pub enum FinishWithdrawalError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CheckBalanceError {
     /// The account in question does not exist.
     NoBalance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CheckInvoiceStatusError {
     /// This invoice was never generated
     InvoiceDoesNotExist,
