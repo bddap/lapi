@@ -1,51 +1,31 @@
 version: '2'
 services:
+  bitcoind:
+    image: bitcoind
+    container_name: bitcoind
+    ports:
+      - "8333:8333"
+      - "28335:28335"
+      - "28336:28336"
+    build:
+      context: bitcoind
+    volumes:
+      - lappi_persist_bitcoind:/root/.bitcoin
 
-    # btc is an image of bitcoin node which used as base image for btcd and
-    # btccli. The environment variables default values determined on stage of
-    # container start within starting script.
-    btc:
-      image: btcd
-      build:
-        context: btcd/
-      volumes:
-        - lappi_persist_btcd:/root/.btcd
-      environment:
-        - RPCUSER
-        - RPCPASS
-        - NETWORK=mainnet
+  lnd:
+    ports:
+      - "10009:10009"
+    image: lnd
+    container_name: lnd
+    build:
+      context: lnd
+    volumes:
+      - lappi_persist_bitcoind:/root/.bitcoin
+      - lappi_persist_lnd:/root/.lnd
+    entrypoint: ["./start-lnd.sh"]
+    links:
+      - "bitcoind:blockchain"
 
-    btcd:
-        extends: btc
-        container_name: btcd
-        environment:
-          - DEBUG
-          - MINING_ADDRESS
-        entrypoint: ["./start-btcd.sh"]
-
-    lnd:
-        ports:
-          - "10009:10009"
-        image: lnd
-        build:
-          context: lnd
-          dockerfile: Dockerfile
-        environment:
-          - RPCUSER
-          - RPCPASS
-          - NETWORK=mainnet
-          - CHAIN
-          - DEBUG
-        volumes:
-          - lappi_persist_btcd:/root/.btcd
-          - lappi_persist_lnd:/root/.lnd
-        entrypoint: ["./start-lnd.sh"]
-
-    lnd_btc:
-      extends: lnd
-      container_name: lnd_btc
-      links:
-          - "btcd:blockchain"
 
 volumes:
   # These volumes point to hardcoded paths. This will need to be fixed before prod.
@@ -57,11 +37,11 @@ volumes:
       type: none
       o: bind
       device: /Volumes/btcchain/persist/lnd
-
-  # Btc chain is stored here
-  lappi_persist_btcd:
+      
+  # bicoind Btc chain is stored here
+  lappi_persist_bitcoind:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /Volumes/btcchain/persist/btcd
+      device: /Volumes/btcchain/persist/bitcoind
