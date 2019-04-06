@@ -8,17 +8,9 @@ pub trait Db: Sync + Send {
         invoice: &Invoice,
     ) -> FutureResult<(), StoreInvoiceError>;
 
-    fn begin_withdrawal(
-        &self,
-        master: Master,
-        amount: Satoshis,
-        fee: Fee<Satoshis>,
-    ) -> FutureResult<(), BeginWithdrawalError>;
+    fn withdraw(&self, master: Master, amount: Satoshis) -> FutureResult<(), WithdrawalError>;
 
-    fn finish_withdrawal(
-        &self,
-        invoice: &PaidInvoiceOutgoing,
-    ) -> FutureResult<(), FinishWithdrawalError>;
+    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> FutureResult<(), DepositError>;
 
     fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError>;
 
@@ -45,29 +37,29 @@ impl ServerError for StoreInvoiceError {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum BeginWithdrawalError {
-    /// Not enough funds for withdrawl.
+pub enum WithdrawalError {
+    /// Not enough funds for withdrawl, or account does not exist.
     InsufficeintBalance,
-    /// The account in question does not exist.
-    NoBalance,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum FinishWithdrawalError {
-    WithdrawalNotInProgress(PaidInvoiceOutgoing),
-    /// Numeric overflow when refunding unused fees to account
-    /// current_balance + refund_amount > MAX
-    Overflow {
-        account: Lesser,
-        current_balance: Satoshis,
-        refund_amount: Satoshis,
-    },
-}
+// #[derive(Clone, PartialEq, Eq, Debug)]
+// pub enum FinishWithdrawalError {
+//     WithdrawalNotInProgress(PaidInvoiceOutgoing),
+// }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CheckBalanceError {
     /// The account in question does not exist.
     NoBalance,
+}
+
+/// Deposit would cause numeric overflow
+/// current_balance + deposit_amount > MAX
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DepositError {
+    pub account: Lesser,
+    pub current_balance: Satoshis,
+    pub deposit_amount: Satoshis,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]

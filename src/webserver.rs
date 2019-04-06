@@ -16,8 +16,7 @@ use warp::{
 pub fn serve() -> Result<(), ServeError> {
     let api_low = ApiLow {
         database: FakeDb::new(),
-        lighting_node: crate::test_util::init_default_lightning_client()
-            .map_err(ServeError::Create)?,
+        lighting_node: init_default_lightning_client().map_err(ServeError::Create)?,
     };
     let api_high = ApiHigh {
         api_low,
@@ -313,6 +312,6 @@ mod test {
         let account_b = Master::random();
         let invoice = new_invoice(&server, 0, account_b.into()).invoice.0;
         let res = pay(&server, &invoice, Satoshis(1), account_b);
-        assert_eq!(res, Err(PayInvoiceErr::NoBalance(())))
+        assert_eq!(res, Err(PayInvoiceErr::InsufficientBalance(())))
     }
 }

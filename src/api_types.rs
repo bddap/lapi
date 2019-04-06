@@ -50,10 +50,7 @@ pub struct GenerateInvoiceExtras {
 //   "amount_satoshis": <uint>,
 //   "fee_satoshis": <uint>
 // }
-// -> { "error": { "overflow": null }
-//             | { "insufficient_balance": null }
-//             | { "no_balance": null }
-//    }
+// -> { "error": { "insufficient_balance": null } }
 //  | { "ok": { "fees_paid_satoshis": <uint> } }
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PayInvoiceRequest {
@@ -68,12 +65,7 @@ pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum PayInvoiceErr {
-    /// Provided invoice did not specify an amount
-    AmountTooLarge(()),
-    FeeTooLarge(()),
-    Overflow(()),
     InsufficientBalance(()),
-    NoBalance(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -235,16 +227,8 @@ mod test {
             },
         );
         ser_de_equiv::<PayInvoiceResponse>(
-            json!({ "error": { "overflow": null } }),
-            Err(PayInvoiceErr::Overflow(())).into(),
-        );
-        ser_de_equiv::<PayInvoiceResponse>(
             json!({ "error": { "insufficient_balance": null } }),
             Err(PayInvoiceErr::InsufficientBalance(())).into(),
-        );
-        ser_de_equiv::<PayInvoiceResponse>(
-            json!({ "error": { "no_balance": null } }),
-            Err(PayInvoiceErr::NoBalance(())).into(),
         );
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "ok": {

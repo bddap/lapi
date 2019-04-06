@@ -10,13 +10,13 @@ use lnd_rust::{
     rpc_grpc::{Lightning, LightningClient},
     tls_certificate::TLSCertificate,
 };
-use std::default::Default;
-use std::time::SystemTime;
 use std::{
+    default::Default,
     io,
     net::{Ipv4Addr, SocketAddr},
     path::Path,
     sync::Arc,
+    time::SystemTime,
 };
 
 const BACKEND_NAME: &str = "lnd";
@@ -198,10 +198,34 @@ impl From<grpc::Error> for CreateError {
     }
 }
 
+pub fn init_default_lightning_client() -> Result<(LightningClient, MacaroonData), CreateError> {
+    // TODO, don't hardcode.
+    init_lightning_client(
+        Path::new("/Volumes/btcchain/persist/lnd/tls.cert"),
+        Path::new("/Volumes/btcchain/persist/lnd/data/chain/bitcoin/mainnet/admin.macaroon"),
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 10009),
+    )
+}
+
+fn init_lightning_client(
+    tls_cert: &Path,
+    macaroon: &Path,
+    addr: SocketAddr,
+) -> Result<(LightningClient, MacaroonData), CreateError> {
+    let certificate = TLSCertificate::from_path(tls_cert)?;
+    let macaroon = MacaroonData::from_file_path(macaroon)?;
+    let config = Default::default();
+    let tls = certificate.into_tls("localhost")?;
+    let grpc_client = grpc::Client::new_expl(&addr, "localhost", tls, config)?;
+    Ok((
+        LightningClient::with_client(Arc::new(grpc_client)),
+        macaroon,
+    ))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::{init_default_lightning_client, init_lightning_client};
     use futures::Future;
     use grpc::{Metadata, RequestOptions};
     use lnd_rust::rpc::GetInfoRequest;

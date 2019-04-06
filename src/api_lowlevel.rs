@@ -32,19 +32,33 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
         amount: Satoshis,
         fee: Fee<Satoshis>,
     ) -> impl Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + 'a {
-        self.database
-            .begin_withdrawal(master, amount, fee)
-            .map_err(PayInvoiceError::Begin)
+        // A malicious client may attempt to send large values for amount and fee, inducing an add overflow.
+        // When amount + fee > u64::MAX, we return InsufficientBalance.
+        let total_withdrawal = amount
+            .checked_add(&fee.0)
+            .ok_or(PayInvoiceError::InsufficientBalance);
+        FutureResult::from(total_withdrawal)
+            .and_then(move |total_withdrawal| {
+                self.database
+                    .withdraw(master, total_withdrawal)
+                    .map_err(PayInvoiceError::from)
+            })
             .and_then(move |()| {
                 self.lighting_node
                     .pay_invoice(invoice, amount, fee)
                     .map_err(PayInvoiceError::Pay)
             })
-            .and_then(move |paid_invoice| {
+            .and_then(move |paid_invoice_outgoing| {
+                debug_assert_eq!(fee, paid_invoice_outgoing.fees_offered);
+                debug_assert!(
+                    paid_invoice_outgoing.fees_offered >= paid_invoice_outgoing.fees_paid
+                );
+                let change: Fee<Satoshis> =
+                    paid_invoice_outgoing.fees_offered - paid_invoice_outgoing.fees_paid;
                 self.database
-                    .finish_withdrawal(&paid_invoice)
-                    .map(|()| paid_invoice)
-                    .map_err(PayInvoiceError::Finish)
+                    .deposit(master.into(), change.0)
+                    .map(|()| paid_invoice_outgoing)
+                    .map_err(PayInvoiceError::RefundFee)
             })
         // TODO, if invoice is never paid, refund balance to user account
         // make sure invoice is not paid after balance is refunded
@@ -73,15 +87,10 @@ pub enum GenerateInvoiceError {
 
 #[derive(Debug, Clone)]
 pub enum PayInvoiceError {
-    /// unpaid_amount + unpaid_fee > MAX
-    OverFlow {
-        unpaid_invoice: Invoice,
-        unpaid_amount: Satoshis,
-        unpaid_fee: Fee<Satoshis>,
-    },
-    Begin(BeginWithdrawalError),
+    InsufficientBalance,
     Pay(PayError),
-    Finish(FinishWithdrawalError),
+    Refund(DepositError),
+    RefundFee(DepositError),
 }
 
 #[cfg(test)]

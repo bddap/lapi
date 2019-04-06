@@ -34,7 +34,6 @@ impl U256 {
         let mut hasher = Sha256::new();
         hasher.input(self.0);
         let result = hasher.fixed_result();
-        let result_slice = result.as_slice();
         U256::try_from_slice(&result).unwrap()
     }
 

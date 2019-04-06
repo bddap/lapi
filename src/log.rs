@@ -22,7 +22,7 @@ pub enum LogErr {
     InvalidInvoiceCreated(ParseOrSemanticError),
     DbStoreInvoiceDuplicate(Lesser, Invoice),
     InvoicePayUnknown(String), // This variant must be removed before deploying to production.
-    FinishWithdrawalError(FinishWithdrawalError),
+    // FinishWithdrawalError(FinishWithdrawalError),
     /// Invoice was paid, but the hash(preimage) != payment_hash backends such as lnd are expected
     /// to guard against this.
     PayPreimageNoMatch {

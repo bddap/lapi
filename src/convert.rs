@@ -23,41 +23,48 @@ impl From<Invoice> for api_types::GenerateInvoiceOk {
 impl MaybeServerError for PayInvoiceError {
     type NotServerError = api_types::PayInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        match self {
-            PayInvoiceError::OverFlow {
-                unpaid_invoice,
-                unpaid_amount,
-                unpaid_fee,
-            } => api_types::PayInvoiceErr::Overflow(()).into(),
-            PayInvoiceError::Begin(BeginWithdrawalError::InsufficeintBalance) => {
-                api_types::PayInvoiceErr::InsufficientBalance(()).into()
-            }
-            PayInvoiceError::Begin(BeginWithdrawalError::NoBalance) => {
-                api_types::PayInvoiceErr::NoBalance(()).into()
-            }
-            PayInvoiceError::Pay(pay_err) => MaybeServerError::maybe_log(pay_err, log),
-            PayInvoiceError::Finish(finish_withdrawal_error) => {
-                LoggedOr::Logged(log.err(LogErr::FinishWithdrawalError(finish_withdrawal_error)))
-            }
-        }
+        // match self {
+        //     PaymentTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()),
+        //     Pay(PayError),
+        //     Refund(DepositError),
+        //     RefundFee(DepositError),
+
+        //     PayInvoiceError::Withdraw(WithdrawalError::InsufficeintBalance) => {
+        //         api_types::PayInvoiceErr::InsufficientBalance(()).into()
+        //     }
+        //     PayInvoiceError::Withdraw(WithdrawalError::NoBalance) => {
+        //         api_types::PayInvoiceErr::NoBalance(()).into()
+        //     }
+        //     PayInvoiceError::Pay(pay_err) => MaybeServerError::maybe_log(pay_err, log),
+        //     PayInvoiceError::Finish(finish_withdrawal_error) => {
+        //         LoggedOr::Logged(log.err(LogErr::FinishWithdrawalError(finish_withdrawal_error)))
+        //     }
+        //     DepositError {
+        //         account,
+        //         current_balance,
+        //         deposit_amount,
+        //     } => api_types::PayInvoiceErr::Overflow(()).into(),
+        // }
+        unimplemented!()
     }
 }
 
 impl MaybeServerError for PayError {
     type NotServerError = api_types::PayInvoiceErr;
     fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        match self {
-            PayError::AmountTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()).into(),
-            PayError::FeeTooLarge => api_types::PayInvoiceErr::FeeTooLarge(()).into(),
-            PayError::PreimageNoMatch {
-                outgoing_paid_invoice,
-            } => LoggedOr::Logged(log.err(LogErr::PayPreimageNoMatch {
-                outgoing_paid_invoice,
-            })),
-            PayError::Unknown(unknown) => {
-                LoggedOr::Logged(log.err(LogErr::InvoicePayUnknown(unknown)))
-            }
-        }
+        // match self {
+        //     PayError::AmountTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()).into(),
+        //     PayError::FeeTooLarge => api_types::PayInvoiceErr::FeeTooLarge(()).into(),
+        //     PayError::PreimageNoMatch {
+        //         outgoing_paid_invoice,
+        //     } => LoggedOr::Logged(log.err(LogErr::PayPreimageNoMatch {
+        //         outgoing_paid_invoice,
+        //     })),
+        //     PayError::Unknown(unknown) => {
+        //         LoggedOr::Logged(log.err(LogErr::InvoicePayUnknown(unknown)))
+        //     }
+        // }
+        unimplemented!()
     }
 }
 
@@ -111,7 +118,7 @@ impl From<InvoiceStatus> for api_types::CheckInvoiceOk {
     fn from(other: InvoiceStatus) -> Self {
         match other {
             InvoiceStatus::Paid(PaidInvoice {
-                invoice,
+                invoice: _,
                 preimage,
                 amount_paid,
             }) => api_types::CheckInvoiceOk::Paid {
@@ -133,6 +140,14 @@ impl MaybeServerError for CheckInvoiceStatusError {
             CheckInvoiceStatusError::Unknown(string) => {
                 LoggedOr::Logged(log.err(LogErr::CheckInvoiceStatusUnknown(string)))
             }
+        }
+    }
+}
+
+impl From<WithdrawalError> for PayInvoiceError {
+    fn from(other: WithdrawalError) -> Self {
+        match other {
+            WithdrawalError::InsufficeintBalance => PayInvoiceError::InsufficientBalance,
         }
     }
 }

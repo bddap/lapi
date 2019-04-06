@@ -10,7 +10,6 @@ impl FakeDb {
         let inner = FakeDbInner {
             balances: BTreeMap::new(),
             history: BTreeMap::new(),
-            withdrawals_in_progress: BTreeMap::new(),
         };
         FakeDb(Mutex::new(inner))
     }
@@ -25,20 +24,12 @@ impl Db for FakeDb {
         self.0.lock().unwrap().store_unpaid_invoice(lesser, invoice)
     }
 
-    fn begin_withdrawal(
-        &self,
-        master: Master,
-        amount: Satoshis,
-        fee: Fee<Satoshis>,
-    ) -> FutureResult<(), BeginWithdrawalError> {
-        self.0.lock().unwrap().begin_withdrawal(master, amount)
+    fn withdraw(&self, master: Master, amount: Satoshis) -> FutureResult<(), WithdrawalError> {
+        self.0.lock().unwrap().withdraw(master, amount)
     }
 
-    fn finish_withdrawal(
-        &self,
-        invoice: &PaidInvoiceOutgoing,
-    ) -> FutureResult<(), FinishWithdrawalError> {
-        self.0.lock().unwrap().finish_withdrawal(invoice)
+    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> FutureResult<(), DepositError> {
+        self.0.lock().unwrap().deposit(lesser, amount)
     }
 
     fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError> {
@@ -56,17 +47,6 @@ impl Db for FakeDb {
 struct FakeDbInner {
     balances: BTreeMap<Lesser, Satoshis>,
     history: BTreeMap<PaymentHash, (Lesser, Invoice, InvoiceStatus)>,
-    withdrawals_in_progress: BTreeMap<PaymentHash, Withdrawal>,
-}
-
-struct Withdrawal {
-    // The invoice being paid.
-    invoice: Invoice,
-    // Sender
-    account: Lesser,
-    // The fee that we deducted from the senders when starting this witdrawal.
-    // Some of this may be refunded later if the actual fee was less than expected.
-    fee: Fee<Satoshis>,
 }
 
 impl FakeDbInner {
@@ -95,39 +75,41 @@ impl FakeDbInner {
         .into()
     }
 
-    pub fn begin_withdrawal(
+    pub fn withdraw(
         &mut self,
         master: Master,
         amount: Satoshis,
-    ) -> FutureResult<(), BeginWithdrawalError> {
-        let middle: Middle = master.into();
-        let lesser: Lesser = middle.into();
+    ) -> FutureResult<(), WithdrawalError> {
         self.balances
-            .get_mut(&lesser)
-            .ok_or(BeginWithdrawalError::NoBalance)
+            .get_mut(&master.into())
+            .ok_or(WithdrawalError::InsufficeintBalance)
             .and_then(|balance: &mut Satoshis| {
                 let new_balance = balance
                     .checked_sub(&amount)
-                    .ok_or(BeginWithdrawalError::InsufficeintBalance)?;
+                    .ok_or(WithdrawalError::InsufficeintBalance)?;
                 *balance = new_balance;
                 Ok(())
             })
             .into()
     }
 
-    /// Withdawal is confirmed complete.
-    pub fn finish_withdrawal(
-        &mut self,
-        invoice: &PaidInvoiceOutgoing,
-    ) -> FutureResult<(), FinishWithdrawalError> {
-        self.withdrawals_in_progress
-            .remove(&PaymentHash::from_invoice(&invoice.paid_invoice.invoice))
-            .ok_or_else(|| FinishWithdrawalError::WithdrawalNotInProgress(invoice.clone()))
-            .map(|withdrawal| {
-                // Refund change to account for unused fees
-                let change: Fee<Satoshis> = withdrawal.fee - invoice.fees_paid;
-            })
-            .into()
+    pub fn deposit(&mut self, lesser: Lesser, amount: Satoshis) -> FutureResult<(), DepositError> {
+        self._deposit(lesser, amount).into()
+    }
+
+    fn _deposit(&mut self, lesser: Lesser, amount: Satoshis) -> Result<(), DepositError> {
+        if !self.balances.contains_key(&lesser) {
+            self.balances.insert(lesser.clone(), Satoshis(0));
+        }
+        let mut balance = self.balances.get_mut(&lesser).unwrap();
+        let new_balance = balance.checked_add(&amount).ok_or(DepositError {
+            account: lesser,
+            current_balance: *balance,
+            deposit_amount: amount,
+        })?;
+        *balance = new_balance;
+        debug_assert_eq!(self.balances.get(&lesser).unwrap(), &new_balance);
+        Ok(()).into()
     }
 
     pub fn check_balance(&mut self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError> {
@@ -149,35 +131,20 @@ impl FakeDbInner {
             .map(Clone::clone)
             .into()
     }
-
-    fn add_to_balance(&mut self, lesser: Lesser, amount: Satoshis) -> Result<(), Overflow> {
-        if !self.balances.contains_key(&lesser) {
-            self.balances.insert(lesser.clone(), Satoshis(0));
-        }
-        let mut balance = self.balances.get_mut(&lesser).unwrap();
-        let new_balance = balance.checked_add(&amount).ok_or(Overflow)?;
-        *balance = new_balance;
-        debug_assert_eq!(self.balances.get(&lesser).unwrap(), &new_balance);
-        Ok(())
-    }
 }
-
-#[derive(Debug)]
-struct Overflow;
 
 #[cfg(test)]
 /// Create a fake_db with a balance in test_util::ACCOUNT_A
 pub fn db_with_account_a_balance() -> FakeDb {
+    use crate::test_util::ACCOUNT_A;
     let db = FakeDb::new();
     {
-        let middle = crate::test_util::ACCOUNT_A.into();
-        let lesser = crate::test_util::ACCOUNT_A.into();
         let mut dbi = db.0.lock().unwrap();
         assert_eq!(
-            dbi.check_balance(middle).wait(),
+            dbi.check_balance(ACCOUNT_A.into()).wait(),
             Err(CheckBalanceError::NoBalance)
         );
-        dbi.add_to_balance(lesser, Satoshis(500)).unwrap();
+        dbi.deposit(ACCOUNT_A.into(), Satoshis(500)).wait().unwrap();
     }
     db
 }

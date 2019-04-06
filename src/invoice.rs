@@ -43,6 +43,7 @@ pub fn to_bolt11(invoice: &Invoice) -> String {
 
 #[cfg(test)]
 mod test {
+    #[test]
     fn parse_then_deserialize() {
         let some_invoice =
             "lnbc420n1pwf2rsfpp5cakf9e6fvcreyywflk0p9wekl4whwk6qm2ge05g2vhjl5ae0gj5qdpsd3h8x6pwwpmj\
@@ -55,6 +56,7 @@ mod test {
         panic!("test not implemented");
     }
 
+    #[test]
     fn invalid_bolt11() {
         // parse invalid invoice
         // assert fail
