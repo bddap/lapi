@@ -26,16 +26,6 @@ pub enum StoreInvoiceError {
     EntryAlreadyExists(Lesser, Invoice),
 }
 
-impl ServerError for StoreInvoiceError {
-    fn into_log_err(self) -> LogErr {
-        match self {
-            StoreInvoiceError::EntryAlreadyExists(lesser, invoice) => {
-                LogErr::DbStoreInvoiceDuplicate(lesser, invoice)
-            }
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum WithdrawalError {
     /// Not enough funds for withdrawl, or account does not exist.
@@ -66,6 +56,4 @@ pub struct DepositError {
 pub enum CheckInvoiceStatusError {
     /// This invoice was never generated
     InvoiceDoesNotExist,
-    /// Network error occured while checking db
-    Unknown(String), // TODO, remove this generic error in favor of other, more concrete errors
 }

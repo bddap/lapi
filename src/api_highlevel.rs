@@ -5,7 +5,10 @@
 
 use crate::api_types;
 use crate::common::*;
-use futures::Future;
+use futures::{
+    future::{loop_fn, Loop},
+    Future,
+};
 
 pub struct ApiHigh<D: Db, L: LightningNode, G: Log> {
     pub api_low: ApiLow<D, L>,
@@ -68,9 +71,18 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
         &'a self,
         payment_hash: PaymentHash,
     ) -> impl Future<Item = api_types::AwaitInvoiceResponse, Error = ErrLogged> + 'a {
-        use futures::future::FutureResult;
-        let a: FutureResult<api_types::AwaitInvoiceResponse, ErrLogged> = unimplemented!();
-        a
+        // We actively poll now for simplicity. This must change before prod.
+        loop_fn((), move |()| {
+            self.api_low
+                .check_invoice_status(payment_hash)
+                .map(|status| match status {
+                    InvoiceStatus::Unpaid => Loop::Continue(()),
+                    InvoiceStatus::Paid(paid_invoice) => Loop::Break(paid_invoice),
+                })
+        })
+        .map(Into::into) // convert PaidInvoice to AwaitInvoiceOk
+        .then(move |res| to_user_result(res, &self.log))
+        .map(Into::into) // convert Result<_, _> to ResultSerDe<_, _>
     }
 }
 

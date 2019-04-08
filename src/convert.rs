@@ -20,67 +20,9 @@ impl From<Invoice> for api_types::GenerateInvoiceOk {
     }
 }
 
-impl MaybeServerError for PayInvoiceError {
-    type NotServerError = api_types::PayInvoiceErr;
-    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        // match self {
-        //     PaymentTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()),
-        //     Pay(PayError),
-        //     Refund(DepositError),
-        //     RefundFee(DepositError),
-
-        //     PayInvoiceError::Withdraw(WithdrawalError::InsufficeintBalance) => {
-        //         api_types::PayInvoiceErr::InsufficientBalance(()).into()
-        //     }
-        //     PayInvoiceError::Withdraw(WithdrawalError::NoBalance) => {
-        //         api_types::PayInvoiceErr::NoBalance(()).into()
-        //     }
-        //     PayInvoiceError::Pay(pay_err) => MaybeServerError::maybe_log(pay_err, log),
-        //     PayInvoiceError::Finish(finish_withdrawal_error) => {
-        //         LoggedOr::Logged(log.err(LogErr::FinishWithdrawalError(finish_withdrawal_error)))
-        //     }
-        //     DepositError {
-        //         account,
-        //         current_balance,
-        //         deposit_amount,
-        //     } => api_types::PayInvoiceErr::Overflow(()).into(),
-        // }
-        unimplemented!()
-    }
-}
-
-impl MaybeServerError for PayError {
-    type NotServerError = api_types::PayInvoiceErr;
-    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        // match self {
-        //     PayError::AmountTooLarge => api_types::PayInvoiceErr::AmountTooLarge(()).into(),
-        //     PayError::FeeTooLarge => api_types::PayInvoiceErr::FeeTooLarge(()).into(),
-        //     PayError::PreimageNoMatch {
-        //         outgoing_paid_invoice,
-        //     } => LoggedOr::Logged(log.err(LogErr::PayPreimageNoMatch {
-        //         outgoing_paid_invoice,
-        //     })),
-        //     PayError::Unknown(unknown) => {
-        //         LoggedOr::Logged(log.err(LogErr::InvoicePayUnknown(unknown)))
-        //     }
-        // }
-        unimplemented!()
-    }
-}
-
 impl<T> From<T> for LoggedOr<T> {
     fn from(other: T) -> Self {
         LoggedOr::UnLogged(other)
-    }
-}
-
-impl MaybeServerError for GenerateInvoiceError {
-    type NotServerError = api_types::GenerateInvoiceErr;
-    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        match self {
-            GenerateInvoiceError::Create(create) => MaybeServerError::maybe_log(create, log),
-            GenerateInvoiceError::Store(store) => LoggedOr::Logged(ServerError::log(store, log)),
-        }
     }
 }
 
@@ -89,11 +31,11 @@ impl From<PaidInvoiceOutgoing> for api_types::PayInvoiceOk {
         let PaidInvoiceOutgoing {
             paid_invoice:
                 PaidInvoice {
-                    invoice: _invoice,
+                    invoice: _,
                     preimage,
-                    amount_paid,
+                    amount_paid: _,
                 },
-            fees_offered,
+            fees_offered: _,
             fees_paid,
         } = other;
         api_types::PayInvoiceOk {
@@ -103,13 +45,10 @@ impl From<PaidInvoiceOutgoing> for api_types::PayInvoiceOk {
     }
 }
 
-impl MaybeServerError for CheckBalanceError {
-    type NotServerError = api_types::CheckBalanceErr;
-    fn maybe_log<L: Log>(self, _log: &L) -> LoggedOr<Self::NotServerError> {
-        match self {
-            CheckBalanceError::NoBalance => {
-                LoggedOr::UnLogged(api_types::CheckBalanceErr::NoBalance(()))
-            }
+impl From<WithdrawalError> for PayInvoiceError {
+    fn from(other: WithdrawalError) -> Self {
+        match other {
+            WithdrawalError::InsufficeintBalance => PayInvoiceError::InsufficientBalance,
         }
     }
 }
@@ -130,24 +69,103 @@ impl From<InvoiceStatus> for api_types::CheckInvoiceOk {
     }
 }
 
-impl MaybeServerError for CheckInvoiceStatusError {
-    type NotServerError = api_types::CheckInvoiceErr;
-    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
+impl From<PaidInvoice> for api_types::AwaitInvoiceOk {
+    fn from(other: PaidInvoice) -> Self {
+        let PaidInvoice {
+            invoice: _,
+            preimage,
+            amount_paid,
+        } = other;
+        api_types::AwaitInvoiceOk {
+            preimage,
+            amount_paid_satoshis: amount_paid,
+        }
+    }
+}
+
+impl MaybeServerError for PayInvoiceError {
+    type NotServerError = api_types::PayInvoiceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
         match self {
-            CheckInvoiceStatusError::InvoiceDoesNotExist => {
-                api_types::CheckInvoiceErr::NonExistent(()).into()
+            PayInvoiceError::InsufficientBalance => {
+                Ok(api_types::PayInvoiceErr::InsufficientBalance(()))
             }
-            CheckInvoiceStatusError::Unknown(string) => {
-                LoggedOr::Logged(log.err(LogErr::CheckInvoiceStatusUnknown(string)))
+            PayInvoiceError::Pay(payerr) => payerr.try_as_response(),
+            PayInvoiceError::RefundFee(deposit_err) => {
+                Err(LogErr::PayInvoiceOverflowOnRefundFee(deposit_err))
+            }
+            PayInvoiceError::Refund(deposit_err) => {
+                Err(LogErr::PayInvoiceOverflowOnRefund(deposit_err).into())
             }
         }
     }
 }
 
-impl From<WithdrawalError> for PayInvoiceError {
-    fn from(other: WithdrawalError) -> Self {
-        match other {
-            WithdrawalError::InsufficeintBalance => PayInvoiceError::InsufficientBalance,
+impl MaybeServerError for PayError {
+    type NotServerError = api_types::PayInvoiceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
+        match self {
+            PayError::AmountTooLarge { amount } => Err(LogErr::PayAmountTooLarge { amount }),
+            PayError::FeeTooLarge { fee } => Err(LogErr::PayFeeTooLarge { fee }),
+            PayError::PreimageNoMatch {
+                outgoing_paid_invoice,
+            } => Err(LogErr::PayPreimageNoMatch {
+                outgoing_paid_invoice,
+            }),
+            PayError::Unknown(stri) => Err(LogErr::PayUnknownError(stri)),
+        }
+    }
+}
+
+impl MaybeServerError for GenerateInvoiceError {
+    type NotServerError = api_types::GenerateInvoiceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
+        match self {
+            GenerateInvoiceError::Create(create) => create.try_as_response(),
+            GenerateInvoiceError::Store(store) => Err(store.into_log_err()),
+        }
+    }
+}
+
+impl MaybeServerError for CheckBalanceError {
+    type NotServerError = api_types::CheckBalanceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
+        match self {
+            CheckBalanceError::NoBalance => Ok(api_types::CheckBalanceErr::NoBalance(())),
+        }
+    }
+}
+
+impl MaybeServerError for CheckInvoiceStatusError {
+    type NotServerError = api_types::CheckInvoiceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
+        match self {
+            CheckInvoiceStatusError::InvoiceDoesNotExist => {
+                Ok(api_types::CheckInvoiceErr::NonExistent(()))
+            }
+        }
+    }
+}
+
+impl MaybeServerError for CreateInvoiceError {
+    type NotServerError = crate::api_types::GenerateInvoiceErr;
+    fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
+        match self {
+            CreateInvoiceError::TooLarge => Ok(crate::api_types::GenerateInvoiceErr::ToLarge(())),
+            CreateInvoiceError::Network { backend_name, err } => {
+                Err(LogErr::InvoiceCreateNetwork { backend_name, err })
+            }
+            CreateInvoiceError::InvalidInvoice(err) => Err(LogErr::InvalidInvoiceCreated(err)),
+        }
+    }
+}
+
+impl ServerError for StoreInvoiceError {
+    fn into_log_err(self) -> LogErr {
+        match self {
+            StoreInvoiceError::EntryAlreadyExists(lesser, invoice) => {
+                LogErr::DbStoreInvoiceDuplicate(lesser, invoice)
+            }
         }
     }
 }

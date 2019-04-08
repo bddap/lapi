@@ -131,13 +131,14 @@ pub type AwaitInvoiceResponse = ResultSerDe<AwaitInvoiceOk, CheckInvoiceErr>;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct AwaitInvoiceOk {
-    pub preimage: U256,
+    pub preimage: Preimage,
     pub amount_paid_satoshis: Satoshis,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::*;
     use core::fmt::Debug;
     use serde::de::DeserializeOwned;
     use serde_json::{from_value, json, to_value, Value};
@@ -233,11 +234,11 @@ mod test {
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "ok": {
                 "fees_paid_satoshis": 10,
-                "preimage": VALID_U256_A,
+                "preimage": PREIMAGE_A_RAW,
             } }),
             Ok(PayInvoiceOk {
                 fees_paid_satoshis: Fee(Satoshis(10)),
-                preimage: Preimage(TYPED_U256_A),
+                preimage: PREIMAGE_A,
             })
             .into(),
         );
@@ -302,11 +303,11 @@ mod test {
         );
         ser_de_equiv::<AwaitInvoiceResponse>(
             json!({ "ok": {
-                "preimage": VALID_U256_A,
+                "preimage": PREIMAGE_A_RAW,
                 "amount_paid_satoshis": 2
             } }),
             Ok(AwaitInvoiceOk {
-                preimage: TYPED_U256_A,
+                preimage: PREIMAGE_A,
                 amount_paid_satoshis: Satoshis(2),
             })
             .into(),

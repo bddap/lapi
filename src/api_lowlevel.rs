@@ -46,9 +46,24 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
             .and_then(move |()| {
                 self.lighting_node
                     .pay_invoice(invoice, amount, fee)
+                    // .or_else(|payerr| {
+                    //     let refund = match payerr {
+                    //         PayError::PaymentImpossible => Ok(()),
+                    //         other => Err(PayInvoiceError::Pay(other)),
+                    //     };
+                    //     FutureResult::from(refund)
+                    //         .and_then(|()| {
+                    //             // payment failed and will never be attempted again, refund entire transaction
+                    //             self.database
+                    //                 .deposit(master.into(), total_withdrawal)
+                    //                 .map_err(PayInvoiceError::Refund)
+                    //         })
+                    //         .and_then(|()| Err(PayError::PaymentImpossible))
+                    // })
                     .map_err(PayInvoiceError::Pay)
             })
             .and_then(move |paid_invoice_outgoing| {
+                /// payment succeeded, refund any unused fees
                 debug_assert_eq!(fee, paid_invoice_outgoing.fees_offered);
                 debug_assert!(
                     paid_invoice_outgoing.fees_offered >= paid_invoice_outgoing.fees_paid
@@ -89,7 +104,9 @@ pub enum GenerateInvoiceError {
 pub enum PayInvoiceError {
     InsufficientBalance,
     Pay(PayError),
+    /// Payment failed, but balance was not refuned due to numerical overflow.
     Refund(DepositError),
+    /// Payment succeeded, but fee change was not refuned due to numerical overflow.
     RefundFee(DepositError),
 }
 
@@ -97,13 +114,12 @@ pub enum PayInvoiceError {
 mod test {
     use super::*;
     use crate::test_util::*;
-    use rand::{thread_rng, Rng};
 
     fn assert_valid_paid(paid: PaidInvoice, original: Invoice, amount_paid: Satoshis) {
         assert_valid_paid_invoice(paid.clone());
         let PaidInvoice {
             invoice,
-            preimage,
+            preimage: _,
             amount_paid: amount_paid_actual,
         } = paid;
         assert_eq!(invoice, original);
@@ -129,29 +145,25 @@ mod test {
         }
     }
 
-    fn gen_auth() -> (Master, Middle, Lesser) {
-        let master: Master = Master::random();
-        let middle: Middle = master.into();
-        let lesser: Lesser = middle.into();
-        (master, middle, lesser)
-    }
-
     fn generate_invoice<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
-        api.generate_invoice(gen_auth().2, Satoshis(1))
+        api.generate_invoice(Master::random().into(), Satoshis(1))
             .wait()
             .unwrap();
     }
 
     fn pay_invoice<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
-        let (master, middle, lesser) = gen_auth();
-        let invoice = api.generate_invoice(lesser, Satoshis(1)).wait().unwrap();
+        let master = Master::random();
+        let invoice = api
+            .generate_invoice(master.into(), Satoshis(1))
+            .wait()
+            .unwrap();
         api.pay_invoice(master, invoice, Satoshis(1), Fee(Satoshis(10)))
             .wait()
             .unwrap();
     }
 
     fn check_balance<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
-        let acct_b: Master = gen_auth().0;
+        let acct_b = Master::random();
 
         // assert lesser has no balance
         assert_eq!(
@@ -217,7 +229,7 @@ mod test {
     }
 
     fn check_invoice_status<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
-        let acct_b: Master = gen_auth().0;
+        let acct_b = Master::random();
 
         // assert lesser balance is Nonexistent
         assert_eq!(
@@ -264,8 +276,8 @@ mod test {
 
     fn check_invoice_status_duo<D: Db, L: LightningNode>(api: ApiLow<D, L>) {
         // create {A,B}user,
-        let au: Master = gen_auth().0;
-        let bu: Master = gen_auth().0;
+        let au = Master::random();
+        let bu = Master::random();
 
         // assert {A,B}lesser balance is Nonexistent
         assert_eq!(
@@ -487,6 +499,7 @@ mod test {
         );
         let final_a_balance = api.check_balance(ACCOUNT_A.into()).wait().unwrap();
         assert_eq!(initial_a_balance, final_a_balance + fees_paid.0);
+        assert_valid_paid_invoice(paid_invoice);
     }
 
     /// Create a new test for each constructable combination of db/node implementations

@@ -25,29 +25,18 @@ pub enum CreateInvoiceError {
     InvalidInvoice(ParseOrSemanticError),
 }
 
-impl MaybeServerError for CreateInvoiceError {
-    type NotServerError = crate::api_types::GenerateInvoiceErr;
-    fn maybe_log<L: Log>(self, log: &L) -> LoggedOr<Self::NotServerError> {
-        match self {
-            CreateInvoiceError::TooLarge => {
-                LoggedOr::UnLogged(crate::api_types::GenerateInvoiceErr::ToLarge(()))
-            }
-            CreateInvoiceError::Network { backend_name, err } => {
-                LoggedOr::log(log, LogErr::InvoiceCreateNetwork { backend_name, err })
-            }
-            CreateInvoiceError::InvalidInvoice(err) => {
-                LoggedOr::log(log, LogErr::InvalidInvoiceCreated(err))
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum PayError {
-    AmountTooLarge,
-    FeeTooLarge,
+    AmountTooLarge {
+        amount: Satoshis,
+    },
+    FeeTooLarge {
+        fee: Fee<Satoshis>,
+    },
     PreimageNoMatch {
         outgoing_paid_invoice: PaidInvoiceOutgoing,
     }, // We can probaly assume lnd will never let this happen.
+    /// The payment did not succeed. The payment will never be attempted again.
+    // PaymentImpossible,
     Unknown(String), // TODO, enumerate payment failure modes, remove String, remove Unknown variant
 }

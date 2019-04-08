@@ -102,12 +102,13 @@ impl FakeDbInner {
             self.balances.insert(lesser.clone(), Satoshis(0));
         }
         let mut balance = self.balances.get_mut(&lesser).unwrap();
-        let new_balance = balance.checked_add(&amount).ok_or(DepositError {
+        let starting_balance = balance.clone();
+        let new_balance = starting_balance.checked_add(&amount).ok_or(DepositError {
             account: lesser,
-            current_balance: *balance,
+            current_balance: starting_balance,
             deposit_amount: amount,
         })?;
-        *balance = new_balance;
+        balance.0 = new_balance.0;
         debug_assert_eq!(self.balances.get(&lesser).unwrap(), &new_balance);
         Ok(()).into()
     }

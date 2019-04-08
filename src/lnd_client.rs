@@ -90,13 +90,13 @@ impl LightningNode for (LightningClient, MacaroonData) {
         let iamount = match amount.checked_to_i64() {
             Some(i) => i,
             None => {
-                return Err(PayError::AmountTooLarge).into();
+                return Err(PayError::AmountTooLarge { amount }).into();
             }
         };
         let imax_fee = match max_fee.0.checked_to_i64() {
             Some(i) => i,
             None => {
-                return Err(PayError::FeeTooLarge).into();
+                return Err(PayError::FeeTooLarge { fee: max_fee }).into();
             }
         };
 
@@ -230,7 +230,6 @@ mod test {
     use grpc::{Metadata, RequestOptions};
     use lnd_rust::rpc::GetInfoRequest;
     use lnd_rust::rpc_grpc::Lightning;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[test]
     fn info() {
@@ -239,7 +238,7 @@ mod test {
         let requestoptions = RequestOptions { metadata };
         let getinforequest = GetInfoRequest::new();
         let fut_response = client.get_info(requestoptions, getinforequest);
-        let (metadata_pre, response, metadata_post) = fut_response.wait().unwrap();
+        let (_metadata_pre, _response, _metadata_post) = fut_response.wait().unwrap();
     }
 
     #[test]
