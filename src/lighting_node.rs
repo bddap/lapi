@@ -27,16 +27,8 @@ pub enum CreateInvoiceError {
 
 #[derive(Debug, Clone)]
 pub enum PayError {
-    AmountTooLarge {
-        amount: Satoshis,
-    },
-    FeeTooLarge {
-        fee: Fee<Satoshis>,
-    },
-    PreimageNoMatch {
-        outgoing_paid_invoice: PaidInvoiceOutgoing,
-    }, // We can probaly assume lnd will never let this happen.
     /// The payment did not succeed. The payment will never be attempted again.
     PaymentAborted,
+    InvalidResponse(PaidInvoiceInvalid),
     Unknown(String), // TODO, enumerate payment failure modes, remove String, remove Unknown variant
 }

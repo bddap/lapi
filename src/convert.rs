@@ -29,17 +29,12 @@ impl<T> From<T> for LoggedOr<T> {
 impl From<PaidInvoiceOutgoing> for api_types::PayInvoiceOk {
     fn from(other: PaidInvoiceOutgoing) -> Self {
         let PaidInvoiceOutgoing {
-            paid_invoice:
-                PaidInvoice {
-                    invoice: _,
-                    preimage,
-                    amount_paid: _,
-                },
+            paid_invoice,
             fees_offered: _,
             fees_paid,
         } = other;
         api_types::PayInvoiceOk {
-            preimage,
+            preimage: paid_invoice.preimage().clone(),
             fees_paid_satoshis: fees_paid,
         }
     }
@@ -56,30 +51,27 @@ impl From<WithdrawalError> for PayInvoiceError {
 impl From<InvoiceStatus> for api_types::CheckInvoiceOk {
     fn from(other: InvoiceStatus) -> Self {
         match other {
-            InvoiceStatus::Paid(PaidInvoice {
-                invoice: _,
-                preimage,
-                amount_paid,
-            }) => api_types::CheckInvoiceOk::Paid {
-                preimage,
-                amount_paid_satoshis: amount_paid,
+            InvoiceStatus::Paid(paid_invoice) => api_types::CheckInvoiceOk::Paid {
+                preimage: paid_invoice.preimage().clone(),
+                amount_paid_satoshis: paid_invoice.amount_paid().clone(),
             },
-            InvoiceStatus::Unpaid => api_types::CheckInvoiceOk::Waiting(()),
+            InvoiceStatus::Unpaid(_) => api_types::CheckInvoiceOk::Waiting(()),
         }
     }
 }
 
 impl From<PaidInvoice> for api_types::AwaitInvoiceOk {
     fn from(other: PaidInvoice) -> Self {
-        let PaidInvoice {
-            invoice: _,
-            preimage,
-            amount_paid,
-        } = other;
         api_types::AwaitInvoiceOk {
-            preimage,
-            amount_paid_satoshis: amount_paid,
+            preimage: other.preimage().clone(),
+            amount_paid_satoshis: other.amount_paid().clone(),
         }
+    }
+}
+
+impl From<PaidInvoiceInvalid> for PayError {
+    fn from(other: PaidInvoiceInvalid) -> Self {
+        PayError::InvalidResponse(other)
     }
 }
 
@@ -105,15 +97,8 @@ impl MaybeServerError for PayError {
     type NotServerError = api_types::PayInvoiceErr;
     fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
         match self {
-            PayError::AmountTooLarge { amount } => Err(LogErr::PayAmountTooLarge { amount }),
-            PayError::FeeTooLarge { fee } => Err(LogErr::PayFeeTooLarge { fee }),
-            PayError::PreimageNoMatch {
-                outgoing_paid_invoice,
-            } => Err(LogErr::PayPreimageNoMatch {
-                outgoing_paid_invoice,
-            }),
-            PayError::Unknown(stri) => Err(LogErr::PayUnknownError(stri)),
             PayError::PaymentAborted => Ok(api_types::PayInvoiceErr::Aborted(())),
+            otherwise => Err(LogErr::PayError(otherwise)),
         }
     }
 }

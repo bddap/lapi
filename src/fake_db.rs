@@ -1,4 +1,5 @@
 use crate::common::*;
+use crate::db::DynFut;
 use futures::{future::FutureResult, Future};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -20,33 +21,37 @@ impl Db for FakeDb {
         &self,
         lesser: Lesser,
         invoice: &Invoice,
-    ) -> FutureResult<(), StoreInvoiceError> {
-        self.0.lock().unwrap().store_unpaid_invoice(lesser, invoice)
+    ) -> DynFut<(), StoreInvoiceError> {
+        Box::new(self.0.lock().unwrap().store_unpaid_invoice(lesser, invoice))
     }
 
-    fn withdraw(&self, master: Master, amount: Satoshis) -> FutureResult<(), WithdrawalError> {
-        self.0.lock().unwrap().withdraw(master, amount)
+    fn withdraw(&self, master: Master, amount: Satoshis) -> DynFut<(), WithdrawalError> {
+        Box::new(self.0.lock().unwrap().withdraw(master, amount))
     }
 
-    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> FutureResult<(), DepositError> {
-        self.0.lock().unwrap().deposit(lesser, amount)
+    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> DynFut<(), DepositError> {
+        Box::new(self.0.lock().unwrap().deposit(lesser, amount))
     }
 
-    fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError> {
-        self.0.lock().unwrap().check_balance(middle)
+    fn check_balance(&self, middle: Middle) -> DynFut<Satoshis, CheckBalanceError> {
+        Box::new(self.0.lock().unwrap().check_balance(middle))
     }
 
     fn check_invoice_status(
         &self,
         payment_hash: U256,
-    ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
-        self.0.lock().unwrap().check_invoice_status(payment_hash)
+    ) -> DynFut<InvoiceStatus, CheckInvoiceStatusError> {
+        Box::new(self.0.lock().unwrap().check_invoice_status(payment_hash))
+    }
+
+    fn receive_paid_invoice(&self, paid_invoice: PaidInvoice) -> DynFut<(), ReceivePaidInvoiceErr> {
+        Box::new(self.0.lock().unwrap().receive_paid_invoice(paid_invoice))
     }
 }
 
 struct FakeDbInner {
     balances: BTreeMap<Lesser, Satoshis>,
-    history: BTreeMap<PaymentHash, (Lesser, Invoice, InvoiceStatus)>,
+    history: BTreeMap<PaymentHash, (Lesser, InvoiceStatus)>,
 }
 
 impl FakeDbInner {
@@ -55,10 +60,10 @@ impl FakeDbInner {
         lesser: Lesser,
         invoice: &Invoice,
     ) -> FutureResult<(), StoreInvoiceError> {
-        let invoice_uuid = PaymentHash::from_invoice(&invoice);
+        let invoice_uuid = get_payment_hash(&invoice);
         match self.history.insert(
             invoice_uuid.clone(),
-            (lesser.clone(), invoice.clone(), InvoiceStatus::Unpaid),
+            (lesser.clone(), InvoiceStatus::Unpaid(invoice.clone())),
         ) {
             None => Ok(()), // Good, there was no entry in the map for this invoice.
             Some(old_value) => {
@@ -123,14 +128,58 @@ impl FakeDbInner {
 
     pub fn check_invoice_status(
         &mut self,
-        payment_hash: U256,
+        payment_hash: PaymentHash,
     ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError> {
         self.history
-            .get(&PaymentHash(payment_hash))
-            .map(|(_entry_lesser, _invoice, status)| status)
+            .get(&payment_hash)
+            .map(|(_entry_lesser, status)| status)
             .ok_or(CheckInvoiceStatusError::InvoiceDoesNotExist)
             .map(Clone::clone)
             .into()
+    }
+
+    fn _receive_paid_invoice(
+        &mut self,
+        paid_invoice: PaidInvoice,
+    ) -> Result<(), ReceivePaidInvoiceErr> {
+        let payment_hash = get_payment_hash(paid_invoice.invoice());
+
+        // get invoice status
+        let mut invoice_status = self
+            .history
+            .get(&payment_hash)
+            .ok_or_else(|| ReceivePaidInvoiceErr::NoMatch(paid_invoice.clone()))?;
+
+        // if it is already paid, Err
+        match invoice_status.1 {
+            InvoiceStatus::Paid(_) => {
+                return Err(ReceivePaidInvoiceErr::Duplicate(paid_invoice));
+            }
+            _ => {}
+        };
+
+        let lesser = invoice_status.0.clone();
+
+        // else deposit amount
+        self._deposit(lesser, *paid_invoice.amount_paid())
+            .map_err(ReceivePaidInvoiceErr::Deposit)?;
+
+        // set status to paid
+        self.history.get_mut(&payment_hash).unwrap().1 = InvoiceStatus::Paid(paid_invoice);
+
+        debug_assert!(match self.history.get(&payment_hash) {
+            Some((_, InvoiceStatus::Paid(_))) => true,
+            _ => false,
+        });
+
+        Ok(())
+    }
+
+    pub fn receive_paid_invoice(
+        &mut self,
+        paid_invoice: PaidInvoice,
+    ) -> FutureResult<(), ReceivePaidInvoiceErr> {
+        self._receive_paid_invoice(paid_invoice).into()
     }
 }
 
@@ -148,14 +197,4 @@ pub fn db_with_account_a_balance() -> FakeDb {
         dbi.deposit(ACCOUNT_A.into(), Satoshis(500)).wait().unwrap();
     }
     db
-}
-
-/// Serves as a UUID for an invoice. Used to associate an invoice with a Lesser.
-#[derive(PartialOrd, Ord, PartialEq, Eq, Clone)]
-struct PaymentHash(U256);
-
-impl PaymentHash {
-    fn from_invoice(invoice: &Invoice) -> PaymentHash {
-        PaymentHash(get_payment_hash(invoice))
-    }
 }

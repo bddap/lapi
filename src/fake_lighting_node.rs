@@ -2,10 +2,13 @@ use crate::common::*;
 use bitcoin_hashes::{sha256, Hash};
 use futures::future::FutureResult;
 use lightning_invoice::{Currency, InvoiceBuilder};
-use rand::{thread_rng, Rng};
 use secp256k1::{key::SecretKey, Secp256k1};
+use std::collections::BTreeMap;
+use std::sync::Mutex;
 
-pub struct FakeLightningNode {}
+pub struct FakeLightningNode {
+    preimages: Mutex<BTreeMap<PaymentHash, Preimage>>,
+}
 
 impl LightningNode for FakeLightningNode {
     fn create_invoice(&self, satoshis: Satoshis) -> FutureResult<Invoice, CreateInvoiceError> {
@@ -15,8 +18,9 @@ impl LightningNode for FakeLightningNode {
             0x3b, 0x2d, 0xb7, 0x34,
         ])
         .unwrap();
-        let random: [u8; 32] = thread_rng().gen();
-        let payment_hash = sha256::Hash::from_slice(&random).unwrap();
+        let random_pre = Preimage(U256::random());
+        self.put_preimage(random_pre.clone());
+        let payment_hash = sha256::Hash::from_slice(&random_pre.hash().0).unwrap();
         satoshis
             .checked_to_pico_btc()
             .ok_or(CreateInvoiceError::TooLarge)
@@ -39,16 +43,36 @@ impl LightningNode for FakeLightningNode {
         max_fee: Fee<Satoshis>,
     ) -> FutureResult<PaidInvoiceOutgoing, PayError> {
         // Yup, looks paid to me.
-        let paid_invoice = PaidInvoice {
-            invoice,
-            preimage: Preimage(U256::zero()),
-            amount_paid: amount,
-        };
+        let preimage = self.get_preimage(get_payment_hash(&invoice)).unwrap();
+        let paid_invoice = PaidInvoice::create(invoice, preimage, amount).unwrap();
         Ok(PaidInvoiceOutgoing {
             paid_invoice,
             fees_offered: max_fee,
             fees_paid: max_fee / Fee(Satoshis(2)),
         })
         .into()
+    }
+}
+
+impl FakeLightningNode {
+    pub fn new() -> Self {
+        FakeLightningNode {
+            preimages: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    fn put_preimage(&self, preimage: Preimage) {
+        self.preimages
+            .lock()
+            .unwrap()
+            .insert(preimage.hash(), preimage);
+    }
+
+    fn get_preimage(&self, payment_hash: PaymentHash) -> Option<Preimage> {
+        self.preimages
+            .lock()
+            .unwrap()
+            .get(&payment_hash)
+            .map(|pre| pre.clone())
     }
 }

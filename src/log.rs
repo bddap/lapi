@@ -20,23 +20,11 @@ pub enum LogErr {
     /// https://github.com/rust-bitcoin/rust-lightning-invoice/issues/30
     InvalidInvoiceCreated(ParseOrSemanticError),
     DbStoreInvoiceDuplicate(Lesser, Invoice),
-    /// Invoice was paid, but the hash(preimage) != payment_hash backends such as lnd are expected
-    /// to guard against this.
-    PayPreimageNoMatch {
-        outgoing_paid_invoice: PaidInvoiceOutgoing,
-    },
     PayInvoiceOverflowOnRefund(DepositError),
     /// Refunding change to account after payment would cause an overflow.
     /// This error is nigh impossible to trigger via legitimate means.
     PayInvoiceOverflowOnRefundFee(DepositError),
-    PayAmountTooLarge {
-        amount: Satoshis,
-    },
-    PayFeeTooLarge {
-        fee: Fee<Satoshis>,
-    },
-    /// TODO this variant should be removed before prod
-    PayUnknownError(String),
+    PayError(PayError),
 }
 
 /// This type is not constructable outside this file.

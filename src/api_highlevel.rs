@@ -5,6 +5,7 @@
 
 use crate::api_types;
 use crate::common::*;
+use futures::future::FutureResult;
 use futures::{
     future::{loop_fn, Loop},
     Future,
@@ -19,7 +20,7 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn generate_invoice<'a>(
         &'a self,
         request: api_types::GenerateInvoiceRequest,
-    ) -> impl Future<Item = api_types::GenerateInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::GenerateInvoiceResponse, Error = ErrLogged> + Send + 'a {
         let api_types::GenerateInvoiceRequest { lesser, satoshis } = request;
         self.api_low
             .generate_invoice(lesser, satoshis)
@@ -31,7 +32,7 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn pay_invoice<'a>(
         &'a self,
         request: api_types::PayInvoiceRequest,
-    ) -> impl Future<Item = api_types::PayInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::PayInvoiceResponse, Error = ErrLogged> + Send + 'a {
         let api_types::PayInvoiceRequest {
             master,
             invoice,
@@ -48,7 +49,7 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn check_balance<'a>(
         &'a self,
         middle: Middle,
-    ) -> impl Future<Item = api_types::CheckBalanceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::CheckBalanceResponse, Error = ErrLogged> + Send + 'a {
         self.api_low
             .check_balance(middle)
             .map(|balance_satoshis| api_types::CheckBalanceOk { balance_satoshis })
@@ -59,7 +60,7 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn check_invoice_status<'a>(
         &'a self,
         payment_hash: PaymentHash,
-    ) -> impl Future<Item = api_types::CheckInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::CheckInvoiceResponse, Error = ErrLogged> + Send + 'a {
         self.api_low
             .check_invoice_status(payment_hash)
             .map(Into::into) // convert InvoiceStatus to CheckInvoiceOk
@@ -70,13 +71,13 @@ impl<D: Db, L: LightningNode, G: Log> ApiHigh<D, L, G> {
     pub fn await_invoice_status<'a>(
         &'a self,
         payment_hash: PaymentHash,
-    ) -> impl Future<Item = api_types::AwaitInvoiceResponse, Error = ErrLogged> + 'a {
+    ) -> impl Future<Item = api_types::AwaitInvoiceResponse, Error = ErrLogged> + Send + 'a {
         // We actively poll now for simplicity. This must change before prod.
         loop_fn((), move |()| {
             self.api_low
                 .check_invoice_status(payment_hash)
                 .map(|status| match status {
-                    InvoiceStatus::Unpaid => Loop::Continue(()),
+                    InvoiceStatus::Unpaid(_) => Loop::Continue(()),
                     InvoiceStatus::Paid(paid_invoice) => Loop::Break(paid_invoice),
                 })
         })

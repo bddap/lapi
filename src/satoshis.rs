@@ -4,6 +4,8 @@ use std::ops::{Add, Div, Mul, Sub};
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Satoshis(pub u64);
 
+const PICO_BTC_PER_SATOSHI: u64 = 10_000;
+
 impl Satoshis {
     pub fn checked_sub(&self, other: &Self) -> Option<Self> {
         self.0.checked_sub(other.0).map(Self)
@@ -14,15 +16,17 @@ impl Satoshis {
     }
 
     pub fn from_pico_btc(pico: u64) -> Result<Self, NotDivisible> {
-        if pico % 10_000 == 0 {
-            Ok(Self(pico / 10_000))
+        let change = pico % PICO_BTC_PER_SATOSHI;
+        let whole = Self(pico / PICO_BTC_PER_SATOSHI);
+        if change == 0 {
+            Ok(whole)
         } else {
-            Err(NotDivisible {})
+            Err(NotDivisible { whole, change })
         }
     }
 
     pub fn checked_to_pico_btc(self) -> Option<u64> {
-        self.0.checked_mul(10_000)
+        self.0.checked_mul(PICO_BTC_PER_SATOSHI)
     }
 
     pub fn checked_to_i64(self) -> Option<i64> {
@@ -33,11 +37,19 @@ impl Satoshis {
             Some(self.0 as i64)
         }
     }
+
+    pub fn saturating_mul(self, other: Satoshis) -> Satoshis {
+        Satoshis(self.0.saturating_mul(other.0))
+    }
 }
 
-/// When converting from pico-btc to satoshi, pico-btc was not a multiple of 10000.
+/// When converting from pico-btc to satoshi, pico-btc was not a multiple of PICO_BTC_PER_SATOSHI.
+/// change is must be less than PICO_BTC_PER_SATOSHI.
 #[derive(Debug, Clone)]
-pub struct NotDivisible;
+pub struct NotDivisible {
+    pub whole: Satoshis,
+    pub change: u64,
+}
 
 impl Div for Satoshis {
     type Output = Self;

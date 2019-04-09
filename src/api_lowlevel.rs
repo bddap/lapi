@@ -33,13 +33,13 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
         fee: Fee<Satoshis>,
     ) -> impl Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + 'a {
         // This function is a tangled bundle of future combinators, sorely in need of async await syntax.
-        
+
         // A malicious client may attempt to send large values for amount and fee, inducing an add overflow.
         // When amount + fee > u64::MAX, we return InsufficientBalance.
         let total_withdrawal = amount
             .checked_add(&fee.0)
             .ok_or(PayInvoiceError::InsufficientBalance);
-        
+
         FutureResult::from(total_withdrawal)
             .and_then(move |total_withdrawal| {
                 self.database
@@ -50,16 +50,26 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
             .and_then(move |total_withdrawal| {
                 self.lighting_node
                     .pay_invoice(invoice, amount, fee)
-                    .or_else(move |payerr| match payerr {
-                        /// payment failed, refund entire transaction
-                        PayError::PaymentAborted => self
-                            .database
-                            .deposit(master.into(), total_withdrawal)
-                            .map_err(PayInvoiceError::Refund)
-                            .and_then(|()| Err(PayInvoiceError::Pay(PayError::PaymentAborted)))
-                            .boxed(),
-                        other => FutureResult::from(Err(PayInvoiceError::Pay(other))).boxed(),
-                    })
+                    .or_else(
+                        move |payerr| -> Box<
+                            Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + Send,
+                        > {
+                            match payerr {
+                                // payment failed, refund entire transaction
+                                PayError::PaymentAborted => Box::new(
+                                    self.database
+                                        .deposit(master.into(), total_withdrawal)
+                                        .map_err(PayInvoiceError::Refund)
+                                        .and_then(|()| {
+                                            Err(PayInvoiceError::Pay(PayError::PaymentAborted))
+                                        }),
+                                ),
+                                other => {
+                                    Box::new(FutureResult::from(Err(PayInvoiceError::Pay(other))))
+                                }
+                            }
+                        },
+                    )
             })
             .and_then(move |paid_invoice_outgoing| {
                 /// payment succeeded, refund any unused fees
@@ -114,31 +124,25 @@ mod test {
 
     fn assert_valid_paid(paid: PaidInvoice, original: Invoice, amount_paid: Satoshis) {
         assert_valid_paid_invoice(paid.clone());
-        let PaidInvoice {
-            invoice,
-            preimage: _,
-            amount_paid: amount_paid_actual,
-        } = paid;
-        assert_eq!(invoice, original);
-        assert_eq!(amount_paid_actual, amount_paid);
+        assert_eq!(paid.invoice(), &original);
+        assert_eq!(&amount_paid, paid.amount_paid());
     }
 
     fn assert_valid_paid_invoice(paid: PaidInvoice) {
-        let PaidInvoice {
-            invoice,
-            preimage,
-            amount_paid,
-        } = paid;
-        let amount_requested = Satoshis::from_pico_btc(invoice.amount_pico_btc().unwrap()).unwrap();
-        assert!(amount_requested >= amount_paid);
-        assert!(amount_requested * Satoshis(2) <= amount_paid);
-        assert_eq!(preimage.hash(), get_payment_hash(&invoice));
+        panic!("no longer needed, PaidInvoice is prevalidated")
     }
 
     fn assert_paid(is: InvoiceStatus) -> PaidInvoice {
         match is {
             InvoiceStatus::Paid(iv) => iv,
-            InvoiceStatus::Unpaid => panic!(),
+            InvoiceStatus::Unpaid(_) => panic!(),
+        }
+    }
+
+    fn assert_unpaid(is: InvoiceStatus) -> Invoice {
+        match is {
+            InvoiceStatus::Paid(_) => panic!(),
+            InvoiceStatus::Unpaid(iv) => iv,
         }
     }
 
@@ -241,11 +245,10 @@ mod test {
             .unwrap();
 
         // assert invoice status unpaid
-        assert_eq!(
+        assert_unpaid(
             api.check_invoice_status(get_payment_hash(&invoice))
                 .wait()
                 .unwrap(),
-            InvoiceStatus::Unpaid
         );
 
         // pay invoice
@@ -319,11 +322,10 @@ mod test {
             .unwrap();
 
         // assert Ainvoice status unpaid, Binvoice status NonExistent
-        assert_eq!(
+        assert_unpaid(
             api.check_invoice_status(get_payment_hash(&ai))
                 .wait()
                 .unwrap(),
-            InvoiceStatus::Unpaid
         );
         assert_eq!(
             api.check_invoice_status(get_payment_hash(&bi))
@@ -509,7 +511,7 @@ mod test {
                 fn fake_fake() {
                     $test(ApiLow {
                         database: crate::fake_db::db_with_account_a_balance(),
-                        lighting_node: FakeLightningNode {},
+                        lighting_node: FakeLightningNode::new(),
                     });
                 }
 

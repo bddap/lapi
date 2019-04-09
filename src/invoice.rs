@@ -6,15 +6,60 @@ use std::borrow::Borrow;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum InvoiceStatus {
     Paid(PaidInvoice),
-    Unpaid,
+    Unpaid(Invoice),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PaidInvoice {
-    pub invoice: Invoice,
-    // hash(preimage) == invoice.payment_hash()
-    pub preimage: Preimage,
-    pub amount_paid: Satoshis,
+    invoice: Invoice,
+    preimage: Preimage,
+    amount_paid: Satoshis,
+}
+
+impl PaidInvoice {
+    pub fn create(
+        invoice: Invoice,
+        preimage: Preimage,
+        amount_paid: Satoshis,
+    ) -> Result<PaidInvoice, PaidInvoiceInvalid> {
+        let amount_requested_pico = invoice.amount_pico_btc().unwrap_or(0);
+        // round amount requested up to the nearest whole satoshi
+        let amount_requested = Satoshis::from_pico_btc(amount_requested_pico)
+            .unwrap_or_else(|NotDivisible { whole, change: _ }| whole + Satoshis(1));
+
+        if preimage.hash() != get_payment_hash(&invoice) {
+            Err(PaidInvoiceInvalid::PreimageMismatch)
+        } else if amount_requested > amount_paid {
+            Err(PaidInvoiceInvalid::AmountTooSmall)
+        } else if amount_requested.saturating_mul(Satoshis(2)) < amount_paid {
+            Err(PaidInvoiceInvalid::AmountTooLarge)
+        } else {
+            Ok(PaidInvoice {
+                invoice,
+                preimage,
+                amount_paid,
+            })
+        }
+    }
+
+    pub fn invoice(&self) -> &Invoice {
+        &self.invoice
+    }
+
+    pub fn preimage(&self) -> &Preimage {
+        &self.preimage
+    }
+
+    pub fn amount_paid(&self) -> &Satoshis {
+        &self.amount_paid
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum PaidInvoiceInvalid {
+    PreimageMismatch,
+    AmountTooSmall,
+    AmountTooLarge,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -24,7 +69,7 @@ pub struct PaidInvoiceOutgoing {
     pub fees_paid: Fee<Satoshis>,
 }
 
-pub fn get_payment_hash(invoice: &Invoice) -> U256 {
+pub fn get_payment_hash(invoice: &Invoice) -> PaymentHash {
     let sl: &[u8] = invoice.payment_hash().0.borrow();
     debug_assert_eq!(sl.len(), 32);
     U256::try_from_slice(sl).unwrap()

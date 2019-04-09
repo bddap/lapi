@@ -1,23 +1,29 @@
 use crate::common::*;
-use futures::future::FutureResult;
+use futures::Future;
+use std::pin::Pin;
+
+pub type DynFut<I, E> = Box<Future<Item = I, Error = E> + Send>;
 
 pub trait Db: Sync + Send {
     fn store_unpaid_invoice(
         &self,
         lesser: Lesser,
         invoice: &Invoice,
-    ) -> FutureResult<(), StoreInvoiceError>;
+    ) -> DynFut<(), StoreInvoiceError>;
 
-    fn withdraw(&self, master: Master, amount: Satoshis) -> FutureResult<(), WithdrawalError>;
+    fn withdraw(&self, master: Master, amount: Satoshis) -> DynFut<(), WithdrawalError>;
 
-    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> FutureResult<(), DepositError>;
+    fn deposit(&self, lesser: Lesser, amount: Satoshis) -> DynFut<(), DepositError>;
 
-    fn check_balance(&self, middle: Middle) -> FutureResult<Satoshis, CheckBalanceError>;
+    fn check_balance(&self, middle: Middle) -> DynFut<Satoshis, CheckBalanceError>;
 
     fn check_invoice_status(
         &self,
         payment_hash: U256,
-    ) -> FutureResult<InvoiceStatus, CheckInvoiceStatusError>;
+    ) -> DynFut<InvoiceStatus, CheckInvoiceStatusError>;
+
+    /// Invoice has been paid,
+    fn receive_paid_invoice(&self, paid_invoice: PaidInvoice) -> DynFut<(), ReceivePaidInvoiceErr>;
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -33,9 +39,14 @@ pub enum WithdrawalError {
 }
 
 // #[derive(Clone, PartialEq, Eq, Debug)]
-// pub enum FinishWithdrawalError {
-//     WithdrawalNotInProgress(PaidInvoiceOutgoing),
-// }
+pub enum ReceivePaidInvoiceErr {
+    // invoice was already paid
+    Duplicate(PaidInvoice),
+    // invoice was untracked, it was not associated with an account
+    NoMatch(PaidInvoice),
+    // Deposit failed
+    Deposit(DepositError),
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CheckBalanceError {

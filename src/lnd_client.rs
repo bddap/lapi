@@ -90,13 +90,21 @@ impl LightningNode for (LightningClient, MacaroonData) {
         let iamount = match amount.checked_to_i64() {
             Some(i) => i,
             None => {
-                return Err(PayError::AmountTooLarge { amount }).into();
+                return Err(PayError::Unknown(format!(
+                    "payment amount {} overflowed max value for lnd",
+                    amount.0
+                )))
+                .into();
             }
         };
         let imax_fee = match max_fee.0.checked_to_i64() {
             Some(i) => i,
             None => {
-                return Err(PayError::FeeTooLarge { fee: max_fee }).into();
+                return Err(PayError::Unknown(format!(
+                    "payment max_fee {} overflowed max value for lnd",
+                    (max_fee.0).0
+                )))
+                .into();
             }
         };
 
@@ -149,23 +157,13 @@ impl LightningNode for (LightningClient, MacaroonData) {
                 // TODO: get actual fees spent on invoice
                 let expected_payment_hash = get_payment_hash(&invoice);
                 let fake_fees = Fee(Satoshis(u64::max_value()));
-                let paid_invoice = PaidInvoice {
-                    invoice,
-                    preimage: Preimage(preimage),
-                    amount_paid: amount,
-                };
+                let paid_invoice = PaidInvoice::create(invoice, Preimage(preimage), amount)?;
                 let paid_invoice_outgoing = PaidInvoiceOutgoing {
                     paid_invoice,
                     fees_offered: max_fee,
                     fees_paid: fake_fees,
                 };
-                if preimage.hash() != expected_payment_hash {
-                    Err(PayError::PreimageNoMatch {
-                        outgoing_paid_invoice: paid_invoice_outgoing,
-                    })
-                } else {
-                    Ok(paid_invoice_outgoing)
-                }
+                Ok(paid_invoice_outgoing)
             })
             .wait()
             .into()
