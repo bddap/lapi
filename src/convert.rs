@@ -113,6 +113,7 @@ impl MaybeServerError for PayError {
                 outgoing_paid_invoice,
             }),
             PayError::Unknown(stri) => Err(LogErr::PayUnknownError(stri)),
+            PayError::PaymentAborted => Ok(api_types::PayInvoiceErr::Aborted(())),
         }
     }
 }

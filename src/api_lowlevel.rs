@@ -32,35 +32,34 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
         amount: Satoshis,
         fee: Fee<Satoshis>,
     ) -> impl Future<Item = PaidInvoiceOutgoing, Error = PayInvoiceError> + 'a {
+        // This function is a tangled bundle of future combinators, sorely in need of async await syntax.
+        
         // A malicious client may attempt to send large values for amount and fee, inducing an add overflow.
         // When amount + fee > u64::MAX, we return InsufficientBalance.
         let total_withdrawal = amount
             .checked_add(&fee.0)
             .ok_or(PayInvoiceError::InsufficientBalance);
+        
         FutureResult::from(total_withdrawal)
             .and_then(move |total_withdrawal| {
                 self.database
                     .withdraw(master, total_withdrawal)
                     .map_err(PayInvoiceError::from)
+                    .map(move |_| total_withdrawal)
             })
-            .and_then(move |()| {
+            .and_then(move |total_withdrawal| {
                 self.lighting_node
                     .pay_invoice(invoice, amount, fee)
-                    // .or_else(|payerr| {
-                    //     let refund = match payerr {
-                    //         PayError::PaymentImpossible => Ok(()),
-                    //         other => Err(PayInvoiceError::Pay(other)),
-                    //     };
-                    //     FutureResult::from(refund)
-                    //         .and_then(|()| {
-                    //             // payment failed and will never be attempted again, refund entire transaction
-                    //             self.database
-                    //                 .deposit(master.into(), total_withdrawal)
-                    //                 .map_err(PayInvoiceError::Refund)
-                    //         })
-                    //         .and_then(|()| Err(PayError::PaymentImpossible))
-                    // })
-                    .map_err(PayInvoiceError::Pay)
+                    .or_else(move |payerr| match payerr {
+                        /// payment failed, refund entire transaction
+                        PayError::PaymentAborted => self
+                            .database
+                            .deposit(master.into(), total_withdrawal)
+                            .map_err(PayInvoiceError::Refund)
+                            .and_then(|()| Err(PayInvoiceError::Pay(PayError::PaymentAborted)))
+                            .boxed(),
+                        other => FutureResult::from(Err(PayInvoiceError::Pay(other))).boxed(),
+                    })
             })
             .and_then(move |paid_invoice_outgoing| {
                 /// payment succeeded, refund any unused fees
@@ -75,8 +74,6 @@ impl<D: Db, L: LightningNode> ApiLow<D, L> {
                     .map(|()| paid_invoice_outgoing)
                     .map_err(PayInvoiceError::RefundFee)
             })
-        // TODO, if invoice is never paid, refund balance to user account
-        // make sure invoice is not paid after balance is refunded
     }
 
     pub fn check_balance<'a>(

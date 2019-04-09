@@ -37,6 +37,6 @@ pub enum PayError {
         outgoing_paid_invoice: PaidInvoiceOutgoing,
     }, // We can probaly assume lnd will never let this happen.
     /// The payment did not succeed. The payment will never be attempted again.
-    // PaymentImpossible,
+    PaymentAborted,
     Unknown(String), // TODO, enumerate payment failure modes, remove String, remove Unknown variant
 }

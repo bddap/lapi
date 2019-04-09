@@ -50,7 +50,8 @@ pub struct GenerateInvoiceExtras {
 //   "amount_satoshis": <uint>,
 //   "fee_satoshis": <uint>
 // }
-// -> { "error": { "insufficient_balance": null } }
+// -> { "error": { "insufficient_balance": null }
+//             | { "aborted": null } }
 //  | { "ok": { "fees_paid_satoshis": <uint> } }
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct PayInvoiceRequest {
@@ -66,6 +67,7 @@ pub type PayInvoiceResponse = ResultSerDe<PayInvoiceOk, PayInvoiceErr>;
 #[serde(rename_all = "snake_case")]
 pub enum PayInvoiceErr {
     InsufficientBalance(()),
+    Aborted(()),
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -230,6 +232,10 @@ mod test {
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "error": { "insufficient_balance": null } }),
             Err(PayInvoiceErr::InsufficientBalance(())).into(),
+        );
+        ser_de_equiv::<PayInvoiceResponse>(
+            json!({ "error": { "aborted": null } }),
+            Err(PayInvoiceErr::Aborted(())).into(),
         );
         ser_de_equiv::<PayInvoiceResponse>(
             json!({ "ok": {
