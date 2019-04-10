@@ -8,6 +8,7 @@ mod db;
 mod fake_db;
 mod fake_lighting_node;
 mod fake_log;
+mod future;
 mod invoice;
 mod lighting_node;
 mod lnd_client;

@@ -1,8 +1,5 @@
 use crate::common::*;
-use futures::Future;
 use std::pin::Pin;
-
-pub type DynFut<I, E> = Box<Future<Item = I, Error = E> + Send>;
 
 pub trait Db: Sync + Send {
     fn store_unpaid_invoice(

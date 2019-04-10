@@ -4,7 +4,7 @@ use lightning_invoice::ParseOrSemanticError;
 
 pub trait LightningNode: Sync + Send {
     /// Generate a unique invoice for n satoshis.
-    fn create_invoice(&self, satoshis: Satoshis) -> FutureResult<Invoice, CreateInvoiceError>;
+    fn create_invoice(&self, satoshis: Satoshis) -> DynFut<Invoice, CreateInvoiceError>;
 
     /// Send to invoice. If invoice does not specfy an amount, return a PayError.
     fn pay_invoice(
@@ -12,17 +12,19 @@ pub trait LightningNode: Sync + Send {
         invoice: Invoice,
         amount: Satoshis,
         max_fee: Fee<Satoshis>,
-    ) -> FutureResult<PaidInvoiceOutgoing, PayError>;
+    ) -> DynFut<PaidInvoiceOutgoing, PayError>;
+
+    // TODO subscribe to incoming invoices, returns a Stream
 }
 
 #[derive(Debug, Clone)]
 pub enum CreateInvoiceError {
-    /// Payment amount exeeded what we can handle.
-    TooLarge,
     /// Backend specific network error description.
     Network { backend_name: String, err: String },
     /// Backend created an invoice, but it was not valid.
     InvalidInvoice(ParseOrSemanticError),
+    /// Generic server error
+    Unknown(String),
 }
 
 #[derive(Debug, Clone)]

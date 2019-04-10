@@ -1,5 +1,4 @@
 use crate::common::*;
-use crate::db::DynFut;
 use futures::{future::FutureResult, Future};
 use std::collections::BTreeMap;
 use std::sync::Mutex;

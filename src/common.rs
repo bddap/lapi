@@ -9,6 +9,7 @@ pub use crate::{
     fake_db::FakeDb,
     fake_lighting_node::FakeLightningNode,
     fake_log::FakeLog,
+    future::DynFut,
     invoice::{
         get_payment_hash, parse_bolt11, to_bolt11, Invoice, InvoiceStatus, PaidInvoice,
         PaidInvoiceInvalid, PaidInvoiceOutgoing,

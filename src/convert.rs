@@ -136,13 +136,7 @@ impl MaybeServerError for CheckInvoiceStatusError {
 impl MaybeServerError for CreateInvoiceError {
     type NotServerError = crate::api_types::GenerateInvoiceErr;
     fn try_as_response(self) -> Result<Self::NotServerError, LogErr> {
-        match self {
-            CreateInvoiceError::TooLarge => Ok(crate::api_types::GenerateInvoiceErr::ToLarge(())),
-            CreateInvoiceError::Network { backend_name, err } => {
-                Err(LogErr::InvoiceCreateNetwork { backend_name, err })
-            }
-            CreateInvoiceError::InvalidInvoice(err) => Err(LogErr::InvalidInvoiceCreated(err)),
-        }
+        Err(LogErr::CreateInvoiceError(self))
     }
 }
 

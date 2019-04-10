@@ -12,19 +12,13 @@ pub trait Log: Sync + Send {
 
 #[derive(Debug, Clone)]
 pub enum LogErr {
-    InvoiceCreateNetwork {
-        backend_name: String,
-        err: String,
-    },
-    /// ParseOrSemanticError is not currently [de]serializable.
-    /// https://github.com/rust-bitcoin/rust-lightning-invoice/issues/30
-    InvalidInvoiceCreated(ParseOrSemanticError),
     DbStoreInvoiceDuplicate(Lesser, Invoice),
     PayInvoiceOverflowOnRefund(DepositError),
     /// Refunding change to account after payment would cause an overflow.
     /// This error is nigh impossible to trigger via legitimate means.
     PayInvoiceOverflowOnRefundFee(DepositError),
     PayError(PayError),
+    CreateInvoiceError(CreateInvoiceError),
 }
 
 /// This type is not constructable outside this file.
