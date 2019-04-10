@@ -14,7 +14,7 @@ pub use crate::{
         get_payment_hash, parse_bolt11, to_bolt11, Invoice, InvoiceStatus, PaidInvoice,
         PaidInvoiceInvalid, PaidInvoiceOutgoing,
     },
-    lighting_node::{CreateInvoiceError, LightningNode, PayError},
+    lighting_node::{CreateInvoiceError, LightningNode, PayError, SubscribePaidInvoicesError},
     lnd_client::{init_default_lightning_client, CreateError},
     log::{ErrLogged, Log, LogErr, LoggedOr, MaybeServerError, ServerError},
     payment_hash::PaymentHash,

@@ -1,6 +1,8 @@
 use crate::common::*;
-use futures::future::FutureResult;
+use futures::{future::FutureResult, Stream};
 use lightning_invoice::ParseOrSemanticError;
+
+pub type DynStream<I, E> = Box<dyn Stream<Item = I, Error = E>>;
 
 pub trait LightningNode: Sync + Send {
     /// Generate a unique invoice for n satoshis.
@@ -14,7 +16,7 @@ pub trait LightningNode: Sync + Send {
         max_fee: Fee<Satoshis>,
     ) -> DynFut<PaidInvoiceOutgoing, PayError>;
 
-    // TODO subscribe to incoming invoices, returns a Stream
+    fn paid_invoices(&self) -> DynStream<PaidInvoice, SubscribePaidInvoicesError>;
 }
 
 #[derive(Debug, Clone)]
@@ -33,4 +35,9 @@ pub enum PayError {
     PaymentAborted,
     InvalidResponse(PaidInvoiceInvalid),
     Unknown(String), // TODO, enumerate payment failure modes, remove String, remove Unknown variant
+}
+
+#[derive(Debug, Clone)]
+pub enum SubscribePaidInvoicesError {
+    Unknown(String),
 }

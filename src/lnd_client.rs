@@ -1,11 +1,11 @@
 use crate::common::*;
-use futures::{future::FutureResult, Future};
+use futures::{future::FutureResult, Future, Stream};
 use grpc::{ClientStub, Metadata, RequestOptions};
 use lnd_rust::{
     macaroon_data::MacaroonData,
     rpc::{
-        AddInvoiceResponse, FeeLimit, FeeLimit_oneof_limit, Invoice_InvoiceState, SendRequest,
-        SendResponse,
+        AddInvoiceResponse, FeeLimit, FeeLimit_oneof_limit, InvoiceSubscription,
+        Invoice_InvoiceState, SendRequest, SendResponse,
     },
     rpc_grpc::{Lightning, LightningClient},
     tls_certificate::TLSCertificate,
@@ -121,6 +121,30 @@ impl LightningNode for (LightningClient, MacaroonData) {
                 },
             );
         Box::new(fut)
+    }
+
+    fn paid_invoices(
+        &self,
+    ) -> crate::lighting_node::DynStream<PaidInvoice, SubscribePaidInvoicesError> {
+        let (client, macaroon) = self;
+        let sub = InvoiceSubscription {
+            settle_index: 1,
+            ..Default::default()
+        };
+        let stream = client
+            .subscribe_invoices(
+                RequestOptions {
+                    metadata: macaroon.metadata(),
+                },
+                sub,
+            )
+            .drop_metadata()
+            .map_err(|err| SubscribePaidInvoicesError::Unknown(format!("{:?}", err)))
+            .and_then(|lnd_iv| {
+                to_paid_invoice(lnd_iv)
+                    .map_err(|err| SubscribePaidInvoicesError::Unknown(format!("{:?}", err)))
+            });
+        Box::new(stream)
     }
 }
 
@@ -247,6 +271,36 @@ fn to_unsigned(a: i64) -> Option<u64> {
     }
 }
 
+fn to_paid_invoice(iv: lnd_rust::rpc::Invoice) -> Result<PaidInvoice, ToPaidInvoiceError> {
+    let lnd_rust::rpc::Invoice {
+        payment_request,
+        r_preimage,
+        amt_paid_sat,
+        state,
+        ..
+    } = iv;
+    let invoice =
+        parse_bolt11(&payment_request).map_err(ToPaidInvoiceError::InvalidPaymentRequest)?;
+    if state == lnd_rust::rpc::Invoice_InvoiceState::OPEN {
+        return Err(ToPaidInvoiceError::NotSettled);
+    }
+    let amount = Satoshis(
+        to_unsigned(amt_paid_sat).ok_or(ToPaidInvoiceError::NegativeAmount(amt_paid_sat))?,
+    );
+    let preimage =
+        Preimage(U256::try_from_slice(&r_preimage).ok_or(ToPaidInvoiceError::PreimageNotProvided)?);
+    PaidInvoice::create(invoice, preimage, amount).map_err(ToPaidInvoiceError::PaidInvoiceInvalid)
+}
+
+#[derive(Debug, Clone)]
+pub enum ToPaidInvoiceError {
+    InvalidPaymentRequest(lightning_invoice::ParseOrSemanticError),
+    NegativeAmount(i64),
+    NotSettled,
+    PreimageNotProvided,
+    PaidInvoiceInvalid(PaidInvoiceInvalid),
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -284,5 +338,6 @@ mod test {
         // call rpc::DecodePayReq
         // verify returned fields are as expected
         // repeat for several invoice variants, attempt to test edge cases
+        unimplemented!()
     }
 }

@@ -1,13 +1,21 @@
 use crate::common::*;
 use bitcoin_hashes::{sha256, Hash};
-use futures::future::FutureResult;
+use futures::{
+    future::FutureResult,
+    sink::Sink,
+    stream::Stream,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 use lightning_invoice::{Currency, InvoiceBuilder};
 use secp256k1::{key::SecretKey, Secp256k1};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+const PAID_CHANNEL_BUF_SIZE: usize = 65536;
+
 pub struct FakeLightningNode {
     preimages: Mutex<BTreeMap<PaymentHash, Preimage>>,
+    paid_ivs: Mutex<Option<Sender<Result<PaidInvoice, SubscribePaidInvoicesError>>>>,
 }
 
 impl LightningNode for FakeLightningNode {
@@ -25,12 +33,27 @@ impl LightningNode for FakeLightningNode {
             self._pay_invoice(invoice, amount, max_fee),
         ))
     }
+
+    fn paid_invoices(
+        &self,
+    ) -> crate::lighting_node::DynStream<PaidInvoice, SubscribePaidInvoicesError> {
+        let mut pivs = self.paid_ivs.lock().unwrap();
+        // paid_invoices() being called twice likely indicates a bug somewhere
+        assert!(pivs.is_none());
+        let (tx, rx) = channel(PAID_CHANNEL_BUF_SIZE);
+        *pivs = Some(tx);
+        Box::new(
+            rx.map_err(|()| unreachable!())
+                .and_then(|resres| FutureResult::from(resres)),
+        )
+    }
 }
 
 impl FakeLightningNode {
     pub fn new() -> Self {
         FakeLightningNode {
             preimages: Mutex::new(BTreeMap::new()),
+            paid_ivs: Mutex::new(None),
         }
     }
 
@@ -83,6 +106,12 @@ impl FakeLightningNode {
         // Yup, looks paid to me.
         let preimage = self.get_preimage(get_payment_hash(&invoice)).unwrap();
         let paid_invoice = PaidInvoice::create(invoice, preimage, amount).unwrap();
+        self.paid_ivs
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .send(Ok(paid_invoice.clone()));
         Ok(PaidInvoiceOutgoing {
             paid_invoice,
             fees_offered: max_fee,
