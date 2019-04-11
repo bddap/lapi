@@ -145,18 +145,15 @@ mod test {
         let raw = warp::test::request()
             .path(path)
             .method("POST")
-            .header("content-length", len)
+            .header("Content-Length", len)
             .body(&bod)
             .reply(server);
-        sj(std::str::from_utf8(raw.body()).unwrap()).unwrap()
+        sj(std::str::from_utf8(raw.body()).expect("decode err")).expect("serialization err")
     }
 
     fn get<R: DeserializeOwned>(server: &server!(), path: &str) -> R {
-        let raw = warp::test::request()
-            .path(path)
-            .method("POST")
-            .reply(server);
-        sj(std::str::from_utf8(raw.body()).unwrap()).unwrap()
+        let raw = warp::test::request().path(path).method("GET").reply(server);
+        sj(std::str::from_utf8(raw.body()).expect("decode err")).expect("serialization err in get")
     }
 
     fn new_invoice(server: &server!(), amount: u8, lesser: Lesser) -> GenerateInvoiceOk {
