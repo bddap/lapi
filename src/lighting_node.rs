@@ -2,7 +2,7 @@ use crate::common::*;
 use futures::{future::FutureResult, Stream};
 use lightning_invoice::ParseOrSemanticError;
 
-pub type DynStream<I, E> = Box<dyn Stream<Item = I, Error = E>>;
+pub type DynStream<I, E> = Box<dyn Stream<Item = I, Error = E> + Send>;
 
 pub trait LightningNode: Sync + Send {
     /// Generate a unique invoice for n satoshis.

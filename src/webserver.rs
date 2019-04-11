@@ -14,10 +14,10 @@ use warp::{
 };
 
 pub fn serve() -> Result<(), ServeError> {
-    let api_low = ApiLow {
-        database: FakeDb::new(),
-        lighting_node: init_default_lightning_client().map_err(ServeError::Create)?,
-    };
+    let api_low = ApiLow::create(
+        FakeDb::new(),
+        init_default_lightning_client().map_err(ServeError::Create)?,
+    );
     let api_high = ApiHigh {
         api_low,
         log: FakeLog,
@@ -119,10 +119,7 @@ mod test {
     }
 
     fn make_server_with_db<D: 'static + Db>(database: D) -> server!() {
-        let api_low = ApiLow {
-            database,
-            lighting_node: init_default_lightning_client().unwrap(),
-        };
+        let api_low = ApiLow::create(database, init_default_lightning_client().unwrap());
         let api_high = ApiHigh {
             api_low,
             log: FakeLog,

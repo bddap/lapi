@@ -1,13 +1,35 @@
 use crate::common::*;
 use futures::future::FutureResult;
+use futures::stream::Stream;
 use futures::Future;
+use std::sync::Arc;
+use std::thread;
 
-pub struct ApiLow<D: Db, L: LightningNode> {
-    pub database: D,
-    pub lighting_node: L,
+pub struct ApiLow<D: Db + 'static, L: LightningNode> {
+    database: Arc<D>,
+    lighting_node: L,
 }
 
 impl<D: Db, L: LightningNode> ApiLow<D, L> {
+    /// link lightning node to db
+    pub fn create(database: D, lighting_node: L) -> ApiLow<D, L> {
+        let database = Arc::new(database);
+
+        // spawn a new thread to take paid invoices from lightning node post them to database
+        let db2 = database.clone();
+        let stream = lighting_node
+            .paid_invoices()
+            .map(move |paid_invoice| db2.receive_paid_invoice(paid_invoice));
+        thread::spawn(|| stream.for_each(|_| FutureResult::from(Ok(()))).wait());
+
+        // TODO log errors from stream and from processing stream
+
+        ApiLow {
+            database,
+            lighting_node,
+        }
+    }
+
     pub fn generate_invoice<'a>(
         &'a self,
         lesser: Lesser,
@@ -509,18 +531,18 @@ mod test {
 
                 #[test]
                 fn fake_fake() {
-                    $test(ApiLow {
-                        database: crate::fake_db::db_with_account_a_balance(),
-                        lighting_node: FakeLightningNode::new(),
-                    });
+                    $test(ApiLow::create(
+                        crate::fake_db::db_with_account_a_balance(),
+                        FakeLightningNode::new(),
+                    ));
                 }
 
                 #[test]
                 fn fake_real() {
-                    $test(ApiLow {
-                        database: crate::fake_db::db_with_account_a_balance(),
-                        lighting_node: init_default_lightning_client().unwrap(),
-                    });
+                    $test(ApiLow::create(
+                        crate::fake_db::db_with_account_a_balance(),
+                        init_default_lightning_client().unwrap(),
+                    ));
                 }
             }
         };

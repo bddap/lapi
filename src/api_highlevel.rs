@@ -11,7 +11,7 @@ use futures::{
     Future,
 };
 
-pub struct ApiHigh<D: Db, L: LightningNode, G: Log> {
+pub struct ApiHigh<D: Db + 'static, L: LightningNode, G: Log> {
     pub api_low: ApiLow<D, L>,
     pub log: G,
 }

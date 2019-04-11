@@ -5,6 +5,7 @@ use futures::{
     sink::Sink,
     stream::Stream,
     sync::mpsc::{channel, Receiver, Sender},
+    Future,
 };
 use lightning_invoice::{Currency, InvoiceBuilder};
 use secp256k1::{key::SecretKey, Secp256k1};
@@ -29,9 +30,8 @@ impl LightningNode for FakeLightningNode {
         amount: Satoshis,
         max_fee: Fee<Satoshis>,
     ) -> DynFut<PaidInvoiceOutgoing, PayError> {
-        Box::new(FutureResult::from(
-            self._pay_invoice(invoice, amount, max_fee),
-        ))
+        let res = self._pay_invoice(invoice, amount, max_fee);
+        Box::new(FutureResult::from(res))
     }
 
     fn paid_invoices(
@@ -111,7 +111,9 @@ impl FakeLightningNode {
             .unwrap()
             .as_mut()
             .unwrap()
-            .send(Ok(paid_invoice.clone()));
+            .send(Ok(paid_invoice.clone()))
+            .wait()
+            .unwrap();
         Ok(PaidInvoiceOutgoing {
             paid_invoice,
             fees_offered: max_fee,
