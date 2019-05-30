@@ -218,7 +218,7 @@ mod test {
 
         // due to a limitation in warp::test, this line must come before wait_for_pay
         // TODO test wait_for_pay, pay in the correct order
-        pay(&server, &invoice, Satoshis(2), ACCOUNT_A).unwrap();
+        pay(&server, &invoice, Satoshis(2), ACCOUNT_A).expect("pay failed");
 
         let mut websocket = warp::test::ws()
             .path(&format!("/invoice/{}", accnt_a_lesser))
@@ -319,5 +319,15 @@ mod test {
         let invoice = new_invoice(&server, 0, account_b.into()).invoice.0;
         let res = pay(&server, &invoice, Satoshis(1), account_b);
         assert_eq!(res, Err(PayInvoiceErr::InsufficientBalance(())))
+    }
+
+    #[test]
+    fn http_500s() {
+        unimplemented!()
+    }
+
+    #[test]
+    fn http_400s() {
+        unimplemented!()
     }
 }

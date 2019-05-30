@@ -145,13 +145,8 @@ mod test {
     use crate::test_util::*;
 
     fn assert_valid_paid(paid: PaidInvoice, original: Invoice, amount_paid: Satoshis) {
-        assert_valid_paid_invoice(paid.clone());
         assert_eq!(paid.invoice(), &original);
         assert_eq!(&amount_paid, paid.amount_paid());
-    }
-
-    fn assert_valid_paid_invoice(paid: PaidInvoice) {
-        panic!("no longer needed, PaidInvoice is prevalidated")
     }
 
     fn assert_paid(is: InvoiceStatus) -> PaidInvoice {
@@ -180,7 +175,7 @@ mod test {
             .generate_invoice(master.into(), Satoshis(1))
             .wait()
             .unwrap();
-        api.pay_invoice(master, invoice, Satoshis(1), Fee(Satoshis(10)))
+        api.pay_invoice(ACCOUNT_A, invoice, Satoshis(1), Fee(Satoshis(10)))
             .wait()
             .unwrap();
     }
@@ -206,7 +201,9 @@ mod test {
 
         // assert lesser has n balance
         assert_eq!(
-            api.check_balance(acct_b.into()).wait().unwrap(),
+            api.check_balance(acct_b.into())
+                .wait()
+                .expect("balance was not updated"),
             Satoshis(3)
         );
     }
@@ -461,7 +458,6 @@ mod test {
             .unwrap();
         assert_eq!(fees_offered, DEFAULT_FEE);
         assert!(fees_paid <= fees_offered);
-        assert_valid_paid_invoice(paid_invoice);
 
         let final_a_balance = api.check_balance(ACCOUNT_A.into()).wait().unwrap();
         assert_eq!(
@@ -494,7 +490,6 @@ mod test {
             .unwrap();
         assert_eq!(fees_offered, DEFAULT_FEE);
         assert!(fees_paid <= fees_offered);
-        assert_valid_paid_invoice(paid_invoice);
 
         let final_a_balance = api.check_balance(ACCOUNT_A.into()).wait().unwrap();
         assert_eq!(initial_a_balance, final_a_balance + fees_paid.0);
@@ -520,7 +515,6 @@ mod test {
         );
         let final_a_balance = api.check_balance(ACCOUNT_A.into()).wait().unwrap();
         assert_eq!(initial_a_balance, final_a_balance + fees_paid.0);
-        assert_valid_paid_invoice(paid_invoice);
     }
 
     /// Create a new test for each constructable combination of db/node implementations
