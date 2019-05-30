@@ -1,5 +1,8 @@
 # Experimental api for easy lightning payments.
 
+This project is parked, waiting for Rust futures and async/await syntax to become stable.
+Without async/await, this code is complex and difficult to reason about.
+
 # todo
 
 - [x] Create lighting node trait
